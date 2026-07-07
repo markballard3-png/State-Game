@@ -2,7 +2,13 @@ import { getRecommendedPractice, getRegionAccuracy, getRank } from "@/lib/game";
 import { regions, states } from "@/data/states";
 import { ProgressData } from "@/types/game";
 
-export function ParentDashboard({ progress }: { progress: ProgressData }) {
+export function ParentDashboard({
+  progress,
+  onResetProgress
+}: {
+  progress: ProgressData;
+  onResetProgress: () => void;
+}) {
   const masteredStates = states.filter(
     (state) => progress.byState[state.abbreviation].masteryScore >= 90
   );
@@ -86,6 +92,15 @@ export function ParentDashboard({ progress }: { progress: ProgressData }) {
           />
         ))}
       </Panel>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onResetProgress}
+          className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/20"
+        >
+          Reset saved progress
+        </button>
+      </div>
     </section>
   );
 }

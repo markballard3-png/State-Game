@@ -1,6 +1,7 @@
 import { rivalries } from "@/data/rivalries";
 import { regions, states } from "@/data/states";
 import {
+  DrillFocus,
   DifficultyLevel,
   GameMode,
   ProgressData,
@@ -84,12 +85,16 @@ export function buildPrompt({
   mode,
   difficulty,
   progress,
-  activeRegion
+  activeRegion,
+  drillFocus,
+  weakOnly
 }: {
   mode: GameMode;
   difficulty: DifficultyLevel;
   progress: ProgressData;
   activeRegion: Region;
+  drillFocus: DrillFocus;
+  weakOnly: boolean;
 }): Prompt | null {
   if (mode === "dashboard") {
     return null;
@@ -116,11 +121,23 @@ export function buildPrompt({
     }
   }
 
+  if (weakOnly) {
+    const weakPool = pool.filter(
+      (state) => progress.byState[state.abbreviation].masteryScore < 70
+    );
+
+    if (weakPool.length > 0) {
+      pool = weakPool;
+    }
+  }
+
   const chosenState = shuffle(weightedPool(pool, progress))[0];
   const questionType =
-    mode === "bowl"
-      ? shuffle<QuestionType>(["map", "capital-choice", "capital-typed"])[0]
-      : getQuestionType(difficulty);
+    drillFocus === "mixed"
+      ? mode === "bowl"
+        ? shuffle<QuestionType>(["map", "capital-choice", "capital-typed"])[0]
+        : getQuestionType(difficulty)
+      : drillFocus;
 
   return {
     kind: "standard",

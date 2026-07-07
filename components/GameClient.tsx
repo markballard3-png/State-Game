@@ -8,10 +8,12 @@ import { ChampionshipMode } from "@/components/ChampionshipMode";
 import { ConferenceStandings } from "@/components/ConferenceStandings";
 import { DesktopDashboardLayout } from "@/components/DesktopDashboardLayout";
 import { FilmRoomPanel } from "@/components/FilmRoomPanel";
+import { FeedbackBanner } from "@/components/FeedbackBanner";
 import { GameModeSelector } from "@/components/GameModeSelector";
 import { MapQuiz } from "@/components/MapQuiz";
 import { OpeningKickoff } from "@/components/OpeningKickoff";
 import { ParentDashboard } from "@/components/ParentDashboard";
+import { PracticeFacilityPanel } from "@/components/PracticeFacilityPanel";
 import { ProgressTracker } from "@/components/ProgressTracker";
 import { RecruitingBoard } from "@/components/RecruitingBoard";
 import { RivalryWeekMode } from "@/components/RivalryWeekMode";
@@ -34,7 +36,14 @@ import {
   updateProgressForAnswer
 } from "@/lib/game";
 import { createInitialProgress, loadProgress, saveProgress } from "@/lib/storage";
-import { DifficultyLevel, GameMode, ProgressData, Prompt, Region } from "@/types/game";
+import {
+  DifficultyLevel,
+  DrillFocus,
+  GameMode,
+  ProgressData,
+  Prompt,
+  Region
+} from "@/types/game";
 
 export function GameClient() {
   const [progress, setProgress] = useState<ProgressData>(createInitialProgress());
@@ -44,11 +53,16 @@ export function GameClient() {
   const [difficulty, setDifficulty] = useState<DifficultyLevel>(1);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [feedback, setFeedback] = useState("Kick off the season and start building confidence.");
+  const [feedbackVariant, setFeedbackVariant] = useState<"neutral" | "success" | "warning">(
+    "neutral"
+  );
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [missesThisPrompt, setMissesThisPrompt] = useState(0);
   const [selectedState, setSelectedState] = useState(states[0]);
   const [seasonStarted, setSeasonStarted] = useState(false);
+  const [drillFocus, setDrillFocus] = useState<DrillFocus>("mixed");
+  const [weakOnly, setWeakOnly] = useState(false);
 
   useEffect(() => {
     const stored = loadProgress();
@@ -74,10 +88,12 @@ export function GameClient() {
         mode: activeMode,
         difficulty,
         progress,
-        activeRegion
+        activeRegion,
+        drillFocus,
+        weakOnly
       })
     );
-  }, [activeMode, difficulty, activeRegion, hydrated]);
+  }, [activeMode, difficulty, activeRegion, hydrated, drillFocus, weakOnly]);
 
   useEffect(() => {
     if (prompt?.kind === "standard") {
@@ -113,7 +129,9 @@ export function GameClient() {
         mode: activeMode,
         difficulty,
         progress: nextProgress,
-        activeRegion
+        activeRegion,
+        drillFocus,
+        weakOnly
       })
     );
     setMissesThisPrompt(0);
@@ -146,6 +164,7 @@ export function GameClient() {
       setFeedback(
         `Touchdown. ${prompt.state.name} is locked in with ${prompt.state.capital}.`
       );
+      setFeedbackVariant("success");
       advancePrompt(nextProgress);
       return;
     }
@@ -157,6 +176,7 @@ export function GameClient() {
         ? `Whistle. Try again and watch the region clue after two misses.`
         : `Not quite. Review the hook: ${prompt.state.memoryHook}`
     );
+    setFeedbackVariant("warning");
 
     if (prompt.questionType !== "map") {
       advancePrompt(nextProgress);
@@ -197,9 +217,36 @@ export function GameClient() {
         ? `Rivalry trophy earned. ${prompt.matchup.title} goes in the win column.`
         : `Tough rivalry loss. The matchup stays on the film room board.`
     );
+    setFeedbackVariant(wasCorrect ? "success" : "warning");
     setScore((current) => current + (wasCorrect ? 20 : 3));
     setStreak((current) => (wasCorrect ? current + 2 : 0));
     advancePrompt(nextProgress);
+  }
+
+  function handleResetProgress() {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        "Reset all saved progress for Capital Kickoff on this browser?"
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const fresh = createInitialProgress();
+    setProgress(fresh);
+    setScore(0);
+    setStreak(0);
+    setFeedback("Fresh season started. Build momentum one state at a time.");
+    setFeedbackVariant("neutral");
+    setSeasonStarted(false);
+    setActiveMode("practice");
+    setActiveRegion(regions[0]);
+    setDifficulty(1);
+    setDrillFocus("mixed");
+    setWeakOnly(false);
+    saveProgress(fresh);
   }
 
   const accuracy = progress.stats.totalQuestions
@@ -244,6 +291,12 @@ export function GameClient() {
               </p>
             </div>
             <GameModeSelector activeMode={activeMode} onChange={setActiveMode} />
+            <PracticeFacilityPanel
+              drillFocus={drillFocus}
+              weakOnly={weakOnly}
+              onDrillFocusChange={setDrillFocus}
+              onWeakOnlyChange={setWeakOnly}
+            />
             <SeasonStatusPanel
               progress={progress}
               activeMode={modeLabels[activeMode]}
@@ -280,7 +333,7 @@ export function GameClient() {
                 Keyboard Shortcuts
               </p>
               <p className="mt-3 text-sm leading-6 text-slate-300">
-                `1-5` difficulty, `P` practice, `R` road trip, `B` bowl review, `Space` start season.
+                1-5 difficulty, P practice, R road trip, B bowl review, Space start season.
               </p>
             </div>
           </div>
@@ -300,10 +353,7 @@ export function GameClient() {
                     Score touchdowns by locating states, calling capitals, and surviving rivalry week.
                   </p>
                 </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/5 px-5 py-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Film Room Note</p>
-                  <p className="mt-2 max-w-sm text-sm text-slate-200">{feedback}</p>
-                </div>
+                <FeedbackBanner message={feedback} variant={feedbackVariant} />
               </div>
             </header>
 
@@ -316,7 +366,7 @@ export function GameClient() {
             ) : null}
 
             {activeMode === "dashboard" ? (
-              <ParentDashboard progress={progress} />
+              <ParentDashboard progress={progress} onResetProgress={handleResetProgress} />
             ) : prompt?.kind === "rivalry" ? (
               (() => {
                 const left = getStateByCode(prompt.matchup.states[0]);

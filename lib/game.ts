@@ -569,6 +569,190 @@ export function getParentStudyPlan(progress: ProgressData) {
   ];
 }
 
+export function getAdaptivePracticeInsights(progress: ProgressData, activeRegion: Region) {
+  const weakState = getWeakStates(progress)[0];
+  const weakCapital = getMostMissedCapitals(progress)[0];
+  const regionAccuracy = getRegionAccuracy(activeRegion, progress);
+
+  return [
+    weakState
+      ? `${weakState.name} is still the lowest-mastery state. Keep it in the next drill block.`
+      : "No weak state stands out yet. Keep spreading reps around the board.",
+    weakCapital
+      ? `${weakCapital.capital} is the shakiest capital recall right now. Use typed reps next.`
+      : "Capital recall is staying balanced so far.",
+    regionAccuracy >= 80
+      ? `${activeRegion} is running hot at ${regionAccuracy}% accuracy.`
+      : `${activeRegion} needs more reps at ${regionAccuracy}% accuracy.`
+  ];
+}
+
+export function getKickoffMissions({
+  progress,
+  sessionQuestions,
+  sessionCorrect,
+  streak,
+  focusedStateCode,
+  focusedStateMastery
+}: {
+  progress: ProgressData;
+  sessionQuestions: number;
+  sessionCorrect: number;
+  streak: number;
+  focusedStateCode: string | null;
+  focusedStateMastery?: number;
+}) {
+  const sessionAccuracy = sessionQuestions
+    ? Math.round((sessionCorrect / sessionQuestions) * 100)
+    : 0;
+  const mastered = getMasteredCount(progress);
+
+  return [
+    {
+      label: "Open the playbook",
+      detail: "Get 12 questions on the board this session.",
+      progress: `${Math.min(sessionQuestions, 12)}/12`,
+      done: sessionQuestions >= 12
+    },
+    {
+      label: "Protect the drive",
+      detail: "Hold 80% accuracy once the warm-up ends.",
+      progress: sessionQuestions === 0 ? "0%" : `${sessionAccuracy}%`,
+      done: sessionQuestions >= 6 && sessionAccuracy >= 80
+    },
+    {
+      label: "Chain mover",
+      detail: "Reach a 6-answer streak.",
+      progress: `${Math.min(streak, 6)}/6`,
+      done: streak >= 6
+    },
+    {
+      label: "5-star chase",
+      detail: focusedStateCode
+        ? "Push the pinned focus state toward stronger mastery."
+        : "Pin a focus state and turn it around.",
+      progress:
+        focusedStateCode && typeof focusedStateMastery === "number"
+          ? `${focusedStateMastery}%`
+          : `${mastered}/50`,
+      done: typeof focusedStateMastery === "number" ? focusedStateMastery >= 70 : false
+    }
+  ];
+}
+
+export function getAchievementSpotlight(progress: ProgressData) {
+  const mastered = getMasteredCount(progress);
+  const nextBadgeTarget =
+    progress.stats.bestStreak < 5
+      ? "Reach a 5-answer streak for Hot Streak."
+      : progress.stats.totalQuestions < 25
+        ? `Answer ${25 - progress.stats.totalQuestions} more questions for Film Room Grinder.`
+        : mastered < 10
+          ? `Master ${10 - mastered} more states for Ten-State Tackler.`
+          : mastered < 25
+            ? `Master ${25 - mastered} more states for Conference Closer.`
+            : "Keep pushing toward all 50 mastered states.";
+
+  if (progress.trophies.includes("National Championship Trophy")) {
+    return {
+      headline: "National Championship Trophy",
+      detail: "You already cleared the biggest trophy on the board.",
+      nextTarget: "Keep polishing weak states and preserve elite accuracy."
+    };
+  }
+
+  if (mastered >= 25) {
+    return {
+      headline: "Conference Closer Pace",
+      detail: `${mastered} states are already at 5-star mastery.`,
+      nextTarget: nextBadgeTarget
+    };
+  }
+
+  return {
+    headline: progress.badges[progress.badges.length - 1] ?? "Season Kickoff",
+    detail: `Current rank is built on ${progress.badges.length} earned badges and ${progress.trophies.length} trophies.`,
+    nextTarget: nextBadgeTarget
+  };
+}
+
+export function getRegionBossChallenge(progress: ProgressData, region: Region) {
+  const regionStates = states.filter((state) => state.region === region);
+  const cleared = regionStates.filter(
+    (state) => progress.byState[state.abbreviation].masteryScore >= 70
+  ).length;
+  const weakest = [...regionStates].sort(
+    (left, right) =>
+      progress.byState[left.abbreviation].masteryScore -
+      progress.byState[right.abbreviation].masteryScore
+  )[0];
+
+  return {
+    title: `${region} Boss Battle`,
+    detail:
+      cleared === regionStates.length
+        ? "This region is cleared. Keep polishing it toward full mastery."
+        : "Get every state in this region to 70% mastery to beat the boss.",
+    progressLabel: `${cleared}/${regionStates.length} states at 70%+`,
+    weakestState: weakest
+      ? `${weakest.name} · ${progress.byState[weakest.abbreviation].masteryScore}% mastery`
+      : "No weak link found"
+  };
+}
+
+export function getModeUnlockPreview(progress: ProgressData) {
+  const availability = getModeAvailability(progress);
+
+  return [
+    {
+      mode: "Rivalry Week",
+      status: availability.rivalry.unlocked ? "Live" : "Locked",
+      detail: availability.rivalry.reason,
+      unlocked: availability.rivalry.unlocked
+    },
+    {
+      mode: "Bowl Review",
+      status: availability.bowl.unlocked ? "Live" : "Locked",
+      detail: availability.bowl.reason,
+      unlocked: availability.bowl.unlocked
+    },
+    {
+      mode: "Championship Mode",
+      status: availability.championship.unlocked ? "Live" : "Locked",
+      detail: availability.championship.reason,
+      unlocked: availability.championship.unlocked
+    }
+  ];
+}
+
+export function getRecoveryCoachTips({
+  misses,
+  promptState,
+  promptQuestionType,
+  focusedStateName,
+  weakStates
+}: {
+  misses: number;
+  promptState?: StateInfo | null;
+  promptQuestionType?: string | null;
+  focusedStateName?: string | null;
+  weakStates: StateInfo[];
+}) {
+  return [
+    promptState
+      ? `Slow it down on ${promptState.name} and say the hook out loud before answering.`
+      : "Use the state memory hook before each answer.",
+    promptQuestionType === "map"
+      ? `After ${misses} miss${misses === 1 ? "" : "es"}, use neighbors and region first.`
+      : "If typed recall slips, switch your brain to first letters before full retrieval.",
+    focusedStateName
+      ? `${focusedStateName} is pinned, so give it one clean recovery rep next.`
+      : weakStates[0]
+        ? `${weakStates[0].name} should be the first bounce-back rep.`
+        : "Pick one weak state and give it a focused comeback rep."
+  ];
+}
+
 export function getEarnedBadges(progress: ProgressData) {
   const badges = ["Season Kickoff"];
   const mastered = Object.values(progress.byState).filter(

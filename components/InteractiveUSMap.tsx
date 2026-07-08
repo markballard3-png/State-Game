@@ -42,21 +42,21 @@ export function InteractiveUSMap({
   const stateLookup = new Map(states.map((state) => [state.abbreviation, state]));
 
   return (
-    <section className="rounded-[28px] border border-white/10 bg-slate-900/60 p-4">
+    <section className="playful-panel rounded-[28px] p-4">
       <div className="mb-3 flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">
             U.S. Map
           </p>
-          <h3 className="mt-1 text-xl font-black">Tap the correct state</h3>
+          <h3 className="mt-1 text-xl font-black text-white">Tap the correct state</h3>
         </div>
-        <p className="max-w-xs text-right text-xs text-slate-400">
+        <p className="max-w-xs text-right text-xs text-slate-200/80">
           Use the real U.S. map. After two misses, the target state glows.
         </p>
       </div>
       <svg
         viewBox="0 0 975 610"
-        className="h-[420px] w-full rounded-2xl bg-[#0f1630] lg:h-[500px]"
+        className="h-[420px] w-full rounded-[24px] bg-[#dcecff] p-3 lg:h-[500px]"
         role="img"
         aria-label="United States map"
       >
@@ -76,16 +76,16 @@ export function InteractiveUSMap({
           const mastery = progress.byState[code].masteryScore;
           const isTarget = targetState === code;
           const isHighlightedRegion = highlightedRegion ? state.region === highlightedRegion : false;
-          const fill = isTarget ? "#2dd4bf" : mastery >= 85 ? "#2563eb" : mastery >= 60 ? "#334155" : "#1f2937";
+          const fill = isTarget ? "#34d399" : mastery >= 85 ? "#60a5fa" : mastery >= 60 ? "#7dd3fc" : "#bfdbfe";
 
           return (
             <path
               key={featureItem.id}
               d={pathGenerator(featureItem as never) ?? ""}
               onClick={() => onSelect(code)}
-              className="cursor-pointer transition hover:fill-[#facc15]"
+              className="cursor-pointer transition duration-150 hover:fill-[#fbbf24]"
               fill={fill}
-              stroke={isHighlightedRegion ? "#facc15" : "#94a3b8"}
+              stroke={isHighlightedRegion ? "#f59e0b" : "#ffffff"}
               strokeWidth={isTarget || isHighlightedRegion ? 2.25 : 1}
             />
           );

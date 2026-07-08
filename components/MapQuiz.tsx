@@ -16,12 +16,12 @@ export function MapQuiz({
 }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
+      <div className="playful-card rounded-[26px] p-5">
+        <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">
           Find the State
         </p>
-        <h2 className="mt-2 text-3xl font-black">Tap {targetState.name} on the map.</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-400">
+        <h2 className="mt-2 text-3xl font-black text-white sm:text-4xl">Tap {targetState.name} on the map.</h2>
+        <p className="mt-3 text-base leading-7 text-slate-100/90">
           Find the state on the real U.S. map. After two misses, the right state will glow.
         </p>
       </div>

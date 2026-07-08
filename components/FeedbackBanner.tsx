@@ -6,9 +6,9 @@ export function FeedbackBanner({
   variant: "neutral" | "success" | "warning";
 }) {
   const styles = {
-    neutral: "border-white/10 bg-white/5 text-slate-200",
-    success: "border-neon/30 bg-neon/10 text-neon",
-    warning: "border-gold/30 bg-gold/10 text-gold"
+    neutral: "border-white/20 bg-white/10 text-white shadow-lg",
+    success: "border-neon/40 bg-neon/15 text-white shadow-lg",
+    warning: "border-gold/40 bg-gold/15 text-white shadow-lg"
   } as const;
 
   const labels = {
@@ -19,8 +19,8 @@ export function FeedbackBanner({
 
   return (
     <div className={`rounded-[24px] border px-5 py-4 ${styles[variant]}`}>
-      <p className="text-xs uppercase tracking-[0.24em] opacity-80">{labels[variant]}</p>
-      <p className="mt-2 max-w-sm text-sm">{message}</p>
+      <p className="text-xs font-bold uppercase tracking-[0.24em] opacity-90">{labels[variant]}</p>
+      <p className="mt-2 max-w-sm text-sm font-medium leading-6">{message}</p>
     </div>
   );
 }

@@ -111,7 +111,8 @@ export function buildPrompt({
   progress,
   activeRegion,
   drillFocus,
-  weakOnly
+  weakOnly,
+  forcedStateCode
 }: {
   mode: GameMode;
   difficulty: DifficultyLevel;
@@ -119,6 +120,7 @@ export function buildPrompt({
   activeRegion: Region;
   drillFocus: DrillFocus;
   weakOnly: boolean;
+  forcedStateCode?: string | null;
 }): Prompt | null {
   if (mode === "dashboard") {
     return null;
@@ -155,7 +157,11 @@ export function buildPrompt({
     }
   }
 
-  const chosenState = shuffle(weightedPool(pool, progress))[0];
+  const forcedState =
+    forcedStateCode
+      ? states.find((state) => state.abbreviation === forcedStateCode)
+      : undefined;
+  const chosenState = forcedState ?? shuffle(weightedPool(pool, progress))[0];
   const questionType =
     drillFocus === "mixed"
       ? mode === "bowl"

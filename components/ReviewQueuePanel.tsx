@@ -1,9 +1,9 @@
-import { StateInfo } from "@/types/game";
+import { ReviewQueueItem } from "@/types/game";
 
 export function ReviewQueuePanel({
   queue
 }: {
-  queue: Array<{ state: StateInfo; priority: number; focus: string }>;
+  queue: ReviewQueueItem[];
 }) {
   return (
     <section className="rounded-[24px] border border-white/10 bg-white/5 p-4">

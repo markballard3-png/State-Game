@@ -12,9 +12,11 @@ import { DriveSituationPanel } from "@/components/DriveSituationPanel";
 import { DriveSummary } from "@/components/DriveSummary";
 import { FilmRoomPanel } from "@/components/FilmRoomPanel";
 import { FeedbackBanner } from "@/components/FeedbackBanner";
+import { FocusDeckPanel } from "@/components/FocusDeckPanel";
 import { GameModeSelector } from "@/components/GameModeSelector";
 import { HalftimeReport } from "@/components/HalftimeReport";
 import { MapQuiz } from "@/components/MapQuiz";
+import { MomentumMomentsPanel } from "@/components/MomentumMomentsPanel";
 import { OpeningKickoff } from "@/components/OpeningKickoff";
 import { NationalRankingPanel } from "@/components/NationalRankingPanel";
 import { ParentDashboard } from "@/components/ParentDashboard";
@@ -26,6 +28,7 @@ import { RivalryWeekMode } from "@/components/RivalryWeekMode";
 import { RoadTripMode } from "@/components/RoadTripMode";
 import { Scoreboard } from "@/components/Scoreboard";
 import { SeasonSchedule } from "@/components/SeasonSchedule";
+import { SessionGoalsPanel } from "@/components/SessionGoalsPanel";
 import { SeasonStatusPanel } from "@/components/SeasonStatusPanel";
 import { StateCard } from "@/components/StateCard";
 import { TeamCardCollection } from "@/components/TeamCardCollection";
@@ -88,6 +91,12 @@ export function GameClient() {
   const [seasonStarted, setSeasonStarted] = useState(false);
   const [drillFocus, setDrillFocus] = useState<DrillFocus>("mixed");
   const [weakOnly, setWeakOnly] = useState(false);
+  const [sessionQuestions, setSessionQuestions] = useState(0);
+  const [sessionCorrect, setSessionCorrect] = useState(0);
+  const [forcedStateCode, setForcedStateCode] = useState<string | null>(null);
+  const [momentumMoments, setMomentumMoments] = useState<string[]>([
+    "Season opened. Start stacking correct answers to build momentum."
+  ]);
 
   useEffect(() => {
     const stored = loadProgress();
@@ -115,10 +124,11 @@ export function GameClient() {
         progress,
         activeRegion,
         drillFocus,
-        weakOnly
+        weakOnly,
+        forcedStateCode
       })
     );
-  }, [activeMode, difficulty, activeRegion, hydrated, drillFocus, weakOnly]);
+  }, [activeMode, difficulty, activeRegion, hydrated, drillFocus, weakOnly, forcedStateCode]);
 
   useEffect(() => {
     if (prompt?.kind === "standard") {
@@ -225,6 +235,7 @@ export function GameClient() {
 
       if (touchdown) {
         setRecentPlays((plays) => ["Touchdown drive finished", ...plays].slice(0, 5));
+        addMomentumMoment("Touchdown drive finished. Big energy on that possession.");
         setDown(1);
         setYardsToGo(10);
         return 0;
@@ -244,7 +255,7 @@ export function GameClient() {
     });
   }
 
-  function advancePrompt(nextProgress = progress) {
+  function advancePrompt(nextProgress = progress, nextForcedStateCode = forcedStateCode) {
     setPrompt(
       buildPrompt({
         mode: activeMode,
@@ -252,10 +263,22 @@ export function GameClient() {
         progress: nextProgress,
         activeRegion,
         drillFocus,
-        weakOnly
+        weakOnly,
+        forcedStateCode: nextForcedStateCode
       })
     );
     setMissesThisPrompt(0);
+  }
+
+  function addMomentumMoment(message: string) {
+    setMomentumMoments((current) => [message, ...current].slice(0, 4));
+  }
+
+  function recordSessionResult(wasCorrect: boolean) {
+    setSessionQuestions((current) => current + 1);
+    if (wasCorrect) {
+      setSessionCorrect((current) => current + 1);
+    }
   }
 
   function handleStandardAnswer(answer: string) {
@@ -273,8 +296,14 @@ export function GameClient() {
       questionType: prompt.questionType,
       wasCorrect
     });
+    const previousModeAvailability = getModeAvailability(progress);
+    const nextModeAvailability = getModeAvailability(nextProgress);
+    const currentStateProgress = progress.byState[prompt.state.abbreviation];
+    const nextStateProgress = nextProgress.byState[prompt.state.abbreviation];
+    const nextStreak = wasCorrect ? streak + 1 : 0;
 
     setProgress(nextProgress);
+    recordSessionResult(wasCorrect);
 
     if (wasCorrect) {
       const points =
@@ -292,6 +321,40 @@ export function GameClient() {
         `Touchdown. ${prompt.state.name} is locked in with ${prompt.state.capital}.`
       );
       setFeedbackVariant("success");
+
+      if ([3, 5, 8].includes(nextStreak)) {
+        addMomentumMoment(`${nextStreak}-play streak. The offense is humming.`);
+      }
+
+      if (currentStateProgress.masteryScore < 90 && nextStateProgress.masteryScore >= 90) {
+        addMomentumMoment(`${prompt.state.name} just became a 5-star state.`);
+      }
+
+      if (
+        !previousModeAvailability.rivalry.unlocked &&
+        nextModeAvailability.rivalry.unlocked
+      ) {
+        addMomentumMoment("Rivalry Week unlocked after a strong early session.");
+      }
+
+      if (!previousModeAvailability.bowl.unlocked && nextModeAvailability.bowl.unlocked) {
+        addMomentumMoment("Bowl Review unlocked. The film room is ready.");
+      }
+
+      if (
+        !previousModeAvailability.championship.unlocked &&
+        nextModeAvailability.championship.unlocked
+      ) {
+        addMomentumMoment("Championship Mode unlocked. You're ready for the title run.");
+      }
+
+      if (forcedStateCode === prompt.state.abbreviation) {
+        setForcedStateCode(null);
+        addMomentumMoment(`${prompt.state.name} cleared its focus rep and leaves the deck.`);
+        advancePrompt(nextProgress, null);
+        return;
+      }
+
       advancePrompt(nextProgress);
       return;
     }
@@ -344,6 +407,7 @@ export function GameClient() {
     });
 
     setProgress(nextProgress);
+    recordSessionResult(wasCorrect);
     setFeedback(
       wasCorrect
         ? `Rivalry trophy earned. ${prompt.matchup.title} goes in the win column.`
@@ -351,6 +415,7 @@ export function GameClient() {
     );
     setFeedbackVariant(wasCorrect ? "success" : "warning");
     setScore((current) => current + (wasCorrect ? 20 : 3));
+    const nextStreak = wasCorrect ? streak + 2 : 0;
     setStreak((current) => (wasCorrect ? current + 2 : 0));
     updateDrive({
       gain: wasCorrect ? 30 : 10,
@@ -359,6 +424,14 @@ export function GameClient() {
         : `${prompt.matchup.title}: rivalry sack for loss`,
       wasCorrect
     });
+
+    if (wasCorrect) {
+      addMomentumMoment(`${prompt.matchup.title} delivered a rivalry win.`);
+      if (nextStreak >= 5) {
+        addMomentumMoment("Big-game confidence is up after that rivalry result.");
+      }
+    }
+
     advancePrompt(nextProgress);
   }
 
@@ -390,6 +463,10 @@ export function GameClient() {
     setDifficulty(1);
     setDrillFocus("mixed");
     setWeakOnly(false);
+    setSessionQuestions(0);
+    setSessionCorrect(0);
+    setForcedStateCode(null);
+    setMomentumMoments(["Fresh season started. New momentum will build from the next snap."]);
     saveProgress(fresh);
   }
 
@@ -424,11 +501,16 @@ export function GameClient() {
   const seasonObjectives = getSeasonObjectives(progress);
   const modeAvailability = getModeAvailability(progress);
   const masteredCountForUnlocks = getMasteredCount(progress);
+  const focusedState =
+    forcedStateCode ? states.find((state) => state.abbreviation === forcedStateCode) ?? null : null;
   const quarterLabel =
     score >= 180 ? "4th Quarter" : score >= 120 ? "3rd Quarter" : score >= 60 ? "2nd Quarter" : "1st Quarter";
   const clipboardBullets = [
     `Mastered states: ${masteredCountForUnlocks}/50`,
     `Unlocked regions: ${progress.unlockedRegions.length}/${regions.length}`,
+    focusedState
+      ? `Focus state pinned: ${focusedState.name}`
+      : "No focus state pinned right now.",
     modeAvailability.championship.unlocked
       ? "Championship Mode is live."
       : modeAvailability.championship.reason
@@ -472,6 +554,15 @@ export function GameClient() {
               weakOnly={weakOnly}
               onDrillFocusChange={setDrillFocus}
               onWeakOnlyChange={setWeakOnly}
+            />
+            <SessionGoalsPanel
+              sessionQuestions={sessionQuestions}
+              sessionCorrect={sessionCorrect}
+              streak={streak}
+              focusedStateName={focusedState?.name ?? null}
+              focusedStateMastery={
+                focusedState ? progress.byState[focusedState.abbreviation].masteryScore : undefined
+              }
             />
             <SeasonStatusPanel
               progress={progress}
@@ -538,6 +629,7 @@ export function GameClient() {
                 <FeedbackBanner message={feedback} variant={feedbackVariant} />
               </div>
             </header>
+            <MomentumMomentsPanel moments={momentumMoments} />
 
             {activeMode === "roadTrip" ? (
               <RoadTripMode
@@ -644,6 +736,26 @@ export function GameClient() {
               capitalTargets={capitalTargets}
             />
             <ReviewQueuePanel queue={reviewQueue.slice(0, 5)} />
+            <FocusDeckPanel
+              queue={reviewQueue.slice(0, 3)}
+              focusedStateCode={forcedStateCode}
+              onFocusState={(stateCode) => {
+                setForcedStateCode(stateCode);
+                const state = getStateByCode(stateCode);
+
+                if (state) {
+                  setSelectedState(state);
+                  addMomentumMoment(`${state.name} moved into the focus deck.`);
+                  setFeedback(`Focused rep loaded for ${state.name}. It will stay in the next prompt rotation.`);
+                  setFeedbackVariant("neutral");
+                }
+              }}
+              onClearFocus={() => {
+                setForcedStateCode(null);
+                setFeedback("Focus deck cleared. Prompt rotation is back to normal.");
+                setFeedbackVariant("neutral");
+              }}
+            />
             <FilmRoomPanel weakStates={weakStates} recommendation={nextPracticeLabel} />
             <TrophyCabinet trophies={progress.trophies} />
             <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">

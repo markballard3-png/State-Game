@@ -72,6 +72,12 @@ export type ProgressData = {
   stats: GlobalStats;
 };
 
+export type ReviewQueueItem = {
+  state: StateInfo;
+  priority: number;
+  focus: string;
+};
+
 export type StandardPrompt = {
   kind: "standard";
   questionType: QuestionType;

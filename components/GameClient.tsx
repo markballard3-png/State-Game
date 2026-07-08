@@ -12,11 +12,14 @@ import { ChampionshipReadinessPanel } from "@/components/ChampionshipReadinessPa
 import { ConferenceStandings } from "@/components/ConferenceStandings";
 import { DesktopDashboardLayout } from "@/components/DesktopDashboardLayout";
 import { CoachClipboard } from "@/components/CoachClipboard";
+import { ComebackPathPanel } from "@/components/ComebackPathPanel";
+import { DriveBonusPanel } from "@/components/DriveBonusPanel";
 import { DriveSituationPanel } from "@/components/DriveSituationPanel";
 import { DriveSummary } from "@/components/DriveSummary";
 import { FilmRoomPanel } from "@/components/FilmRoomPanel";
 import { FeedbackBanner } from "@/components/FeedbackBanner";
 import { FocusDeckPanel } from "@/components/FocusDeckPanel";
+import { FocusTimerPanel } from "@/components/FocusTimerPanel";
 import { GameModeSelector } from "@/components/GameModeSelector";
 import { DailyChallengePanel } from "@/components/DailyChallengePanel";
 import { HalftimeReport } from "@/components/HalftimeReport";
@@ -29,9 +32,13 @@ import { ParentDashboard } from "@/components/ParentDashboard";
 import { PersonalRecordsPanel } from "@/components/PersonalRecordsPanel";
 import { PlaybookPanel } from "@/components/PlaybookPanel";
 import { PracticeFacilityPanel } from "@/components/PracticeFacilityPanel";
+import { PracticePresetPanel } from "@/components/PracticePresetPanel";
 import { ProgressTracker } from "@/components/ProgressTracker";
+import { PressurePanel } from "@/components/PressurePanel";
 import { RecruitingBoard } from "@/components/RecruitingBoard";
 import { RecoveryCoachPanel } from "@/components/RecoveryCoachPanel";
+import { HotStreakStatesPanel } from "@/components/HotStreakStatesPanel";
+import { MasteryRadarPanel } from "@/components/MasteryRadarPanel";
 import { RegionVictoryPanel } from "@/components/RegionVictoryPanel";
 import { RegionBossPanel } from "@/components/RegionBossPanel";
 import { RivalryWeekMode } from "@/components/RivalryWeekMode";
@@ -40,6 +47,7 @@ import { RoadTripMode } from "@/components/RoadTripMode";
 import { Scoreboard } from "@/components/Scoreboard";
 import { SeasonSchedule } from "@/components/SeasonSchedule";
 import { SessionGoalsPanel } from "@/components/SessionGoalsPanel";
+import { SessionMilestonesPanel } from "@/components/SessionMilestonesPanel";
 import { SessionWrapPanel } from "@/components/SessionWrapPanel";
 import { SeasonStatusPanel } from "@/components/SeasonStatusPanel";
 import { StateCard } from "@/components/StateCard";
@@ -48,24 +56,30 @@ import { TrophyCabinet } from "@/components/TrophyCabinet";
 import { UnlockPreviewPanel } from "@/components/UnlockPreviewPanel";
 import { ReviewQueuePanel } from "@/components/ReviewQueuePanel";
 import { RewardTrack } from "@/components/RewardTrack";
+import { WeeklyGoalsPanel } from "@/components/WeeklyGoalsPanel";
 import { regions, states } from "@/data/states";
 import {
   buildPrompt,
   getAchievementSpotlight,
   getAdaptivePracticeInsights,
   getChampionshipReadiness,
+  getComebackPath,
   getConferenceStandings,
   getDailyChallenge,
+  getDriveBonuses,
   getEarnedBadges,
   getEarnedTrophies,
   getHalftimeSummary,
+  getHotStreakStates,
   getHintLadder,
   getKickoffMissions,
+  getMasteryRadar,
   getModeAvailability,
   getMostMissedCapitals,
   getMostMissedMapStates,
   getModeUnlockPreview,
   getNationalRanking,
+  getPressureSummary,
   getRecoveryCoachTips,
   getRegionBossChallenge,
   getRegionVictoryStatus,
@@ -75,9 +89,11 @@ import {
   getPracticeScript,
   getRank,
   getReviewQueue,
+  getSessionMilestones,
   getSeasonObjectives,
   getStateByCode,
   getWeakStates,
+  getWeeklyGoals,
   modeLabels,
   updateProgressForAnswer
 } from "@/lib/game";
@@ -118,6 +134,7 @@ export function GameClient() {
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionBestStreak, setSessionBestStreak] = useState(0);
   const [sessionHighScore, setSessionHighScore] = useState(0);
+  const [sessionFocusSeconds, setSessionFocusSeconds] = useState(0);
   const [forcedStateCode, setForcedStateCode] = useState<string | null>(null);
   const [momentumMoments, setMomentumMoments] = useState<string[]>([
     "Season opened. Start stacking correct answers to build momentum."
@@ -129,6 +146,18 @@ export function GameClient() {
   const [rivalryHistory, setRivalryHistory] = useState<
     Array<{ title: string; result: "win" | "loss"; detail: string }>
   >([]);
+
+  useEffect(() => {
+    if (!seasonStarted || activeMode === "dashboard") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSessionFocusSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [seasonStarted, activeMode, sessionFocusSeconds]);
 
   useEffect(() => {
     const stored = loadProgress();
@@ -537,6 +566,7 @@ export function GameClient() {
     setSessionCorrect(0);
     setSessionBestStreak(0);
     setSessionHighScore(0);
+    setSessionFocusSeconds(0);
     setForcedStateCode(null);
     setLongestDrive(0);
     setAnswerHistory([]);
@@ -550,6 +580,7 @@ export function GameClient() {
     setSessionCorrect(0);
     setSessionBestStreak(0);
     setSessionHighScore(0);
+    setSessionFocusSeconds(0);
     setLongestDrive(0);
     setAnswerHistory([]);
     setMomentumMoments(["New session started. Build another run of momentum."]);
@@ -601,6 +632,8 @@ export function GameClient() {
   });
   const achievementSpotlight = getAchievementSpotlight(progress);
   const championshipReadiness = getChampionshipReadiness(progress);
+  const driveBonuses = getDriveBonuses(driveYards, streak, playClock);
+  const pressureSummary = getPressureSummary({ down, yardsToGo, playClock });
   const regionBossChallenge = getRegionBossChallenge(progress, activeRegion);
   const regionVictoryStatus = getRegionVictoryStatus(progress, activeRegion);
   const unlockPreview = getModeUnlockPreview(progress);
@@ -613,6 +646,20 @@ export function GameClient() {
   });
   const nationalRanking = getNationalRanking(progress);
   const seasonObjectives = getSeasonObjectives(progress);
+  const sessionMilestones = getSessionMilestones({
+    sessionQuestions,
+    sessionCorrect,
+    sessionBestStreak,
+    sessionHighScore
+  });
+  const weeklyGoals = getWeeklyGoals(progress);
+  const masteryRadar = getMasteryRadar(progress);
+  const hotStreakStates = getHotStreakStates(progress);
+  const comebackPath = getComebackPath({
+    misses: missesThisPrompt,
+    weakStates,
+    focusedStateName: focusedState?.name ?? null
+  });
   const modeAvailability = getModeAvailability(progress);
   const masteredCountForUnlocks = getMasteredCount(progress);
   const sessionAccuracy = sessionQuestions
@@ -645,6 +692,19 @@ export function GameClient() {
     setActiveMode(mode);
   }
 
+  function applyPracticePreset(preset: {
+    drillFocus: DrillFocus;
+    weakOnly: boolean;
+    difficulty: DifficultyLevel;
+    label: string;
+  }) {
+    setDrillFocus(preset.drillFocus);
+    setWeakOnly(preset.weakOnly);
+    setDifficulty(preset.difficulty);
+    setFeedback(`${preset.label} preset loaded. Attack the next rep with intention.`);
+    setFeedbackVariant("neutral");
+  }
+
   return (
     <AppShell>
       <div className="relative">
@@ -674,6 +734,7 @@ export function GameClient() {
               onDrillFocusChange={setDrillFocus}
               onWeakOnlyChange={setWeakOnly}
             />
+            <PracticePresetPanel onApplyPreset={applyPracticePreset} />
             <DailyChallengePanel
               title={dailyChallenge.title}
               detail={dailyChallenge.detail}
@@ -681,6 +742,10 @@ export function GameClient() {
               completed={dailyChallenge.completed}
             />
             <KickoffMissionPanel missions={kickoffMissions} />
+            <FocusTimerPanel
+              seconds={sessionFocusSeconds}
+              label={sessionFocusSeconds >= 900 ? "Strong focus block." : "Build toward a 15-minute block."}
+            />
             <SessionGoalsPanel
               sessionQuestions={sessionQuestions}
               sessionCorrect={sessionCorrect}
@@ -773,6 +838,7 @@ export function GameClient() {
             />
             <MomentumMomentsPanel moments={momentumMoments} />
             <AdaptiveInsightsPanel insights={adaptiveInsights} />
+            <SessionMilestonesPanel milestones={sessionMilestones} />
             <RegionVictoryPanel
               title={regionVictoryStatus.title}
               detail={regionVictoryStatus.detail}
@@ -785,6 +851,7 @@ export function GameClient() {
               progressLabel={regionBossChallenge.progressLabel}
               weakestState={regionBossChallenge.weakestState}
             />
+            <WeeklyGoalsPanel goals={weeklyGoals} />
 
             {activeMode === "roadTrip" ? (
               <RoadTripMode
@@ -876,8 +943,10 @@ export function GameClient() {
               driveYards={driveYards}
               quarterLabel={quarterLabel}
             />
+            <PressurePanel headline={pressureSummary.headline} detail={pressureSummary.detail} />
             <DriveSituationPanel down={down} yardsToGo={yardsToGo} playClock={playClock} />
             <DriveSummary driveYards={driveYards} recentPlays={recentPlays} />
+            <DriveBonusPanel bonuses={driveBonuses} />
             <HalftimeReport
               summary={halftimeSummary}
               score={score}
@@ -895,6 +964,7 @@ export function GameClient() {
             />
             <ReviewQueuePanel queue={reviewQueue.slice(0, 5)} />
             <AnswerHistoryPanel history={answerHistory} />
+            <HotStreakStatesPanel states={hotStreakStates} />
             <FocusDeckPanel
               queue={reviewQueue.slice(0, 3)}
               focusedStateCode={forcedStateCode}
@@ -917,8 +987,10 @@ export function GameClient() {
             />
             <UnlockPreviewPanel items={unlockPreview} />
             <RivalryHistoryPanel history={rivalryHistory} />
+            <ComebackPathPanel steps={comebackPath} />
             <RecoveryCoachPanel tips={recoveryCoachTips} />
             <FilmRoomPanel weakStates={weakStates} recommendation={nextPracticeLabel} />
+            <MasteryRadarPanel items={masteryRadar} />
             <ChampionshipReadinessPanel
               score={championshipReadiness.score}
               summary={championshipReadiness.summary}

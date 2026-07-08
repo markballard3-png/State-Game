@@ -848,6 +848,171 @@ export function getFamilyHuddleNotes(progress: ProgressData) {
   ];
 }
 
+export function getDriveBonuses(driveYards: number, streak: number, playClock: number) {
+  return [
+    driveYards >= 50 ? "Midfield bonus active." : "Cross midfield to unlock a drive bonus.",
+    streak >= 4 ? "Streak bonus active." : "Reach a 4-play streak for streak bonus points.",
+    playClock >= 15 ? "Tempo bonus available." : "Answer quicker to keep the tempo bonus alive."
+  ];
+}
+
+export function getPressureSummary({
+  down,
+  yardsToGo,
+  playClock
+}: {
+  down: number;
+  yardsToGo: number;
+  playClock: number;
+}) {
+  if (down >= 4 && yardsToGo >= 8) {
+    return {
+      headline: "Fourth-down pressure",
+      detail: `Need ${yardsToGo} yards with ${playClock}s on the clock. Pick the safest rep.`
+    };
+  }
+
+  if (playClock <= 10) {
+    return {
+      headline: "Tempo pressure",
+      detail: `Only ${playClock}s left. Trust the first good recall and snap the answer.`
+    };
+  }
+
+  return {
+    headline: "Manageable situation",
+    detail: `${yardsToGo} yards to go on down ${down}. Stay calm and keep the drive alive.`
+  };
+}
+
+export function getSessionMilestones({
+  sessionQuestions,
+  sessionCorrect,
+  sessionBestStreak,
+  sessionHighScore
+}: {
+  sessionQuestions: number;
+  sessionCorrect: number;
+  sessionBestStreak: number;
+  sessionHighScore: number;
+}) {
+  const accuracy = sessionQuestions
+    ? Math.round((sessionCorrect / sessionQuestions) * 100)
+    : 0;
+
+  return [
+    {
+      label: "10-question set",
+      progress: `${Math.min(sessionQuestions, 10)}/10`,
+      done: sessionQuestions >= 10
+    },
+    {
+      label: "80% accuracy",
+      progress: `${accuracy}%`,
+      done: sessionQuestions >= 5 && accuracy >= 80
+    },
+    {
+      label: "5-play streak",
+      progress: `${Math.min(sessionBestStreak, 5)}/5`,
+      done: sessionBestStreak >= 5
+    },
+    {
+      label: "Score 100",
+      progress: `${Math.min(sessionHighScore, 100)}/100`,
+      done: sessionHighScore >= 100
+    }
+  ];
+}
+
+export function getComebackPath({
+  misses,
+  weakStates,
+  focusedStateName
+}: {
+  misses: number;
+  weakStates: StateInfo[];
+  focusedStateName?: string | null;
+}) {
+  return [
+    misses > 0
+      ? `Reset with one easy rep before attacking the next hard question.`
+      : "Keep the pressure low by staying one clean rep ahead.",
+    focusedStateName
+      ? `Use ${focusedStateName} as the bounce-back state if the drive stalls.`
+      : weakStates[0]
+        ? `Bounce back through ${weakStates[0].name} before returning to mixed reps.`
+        : "Pick one trusted state for a recovery rep.",
+    "Say the hook, picture the map, then answer."
+  ];
+}
+
+export function getWeeklyGoals(progress: ProgressData) {
+  const mastered = getMasteredCount(progress);
+  const accuracy = progress.stats.totalQuestions
+    ? Math.round((progress.stats.correctAnswers / progress.stats.totalQuestions) * 100)
+    : 0;
+
+  return [
+    {
+      label: "Master 5 more states",
+      detail: `${mastered}/50 five-star states are complete.`,
+      done: mastered >= 5
+    },
+    {
+      label: "Hold 80% team accuracy",
+      detail: `Current team accuracy is ${accuracy}%.`,
+      done: accuracy >= 80
+    },
+    {
+      label: "Earn a bowl banner",
+      detail: `${progress.stats.bowlTrophies} bowl trophies earned so far.`,
+      done: progress.stats.bowlTrophies >= 1
+    }
+  ];
+}
+
+export function getMasteryRadar(progress: ProgressData) {
+  const totalStates = states.length;
+  const mastered = getMasteredCount(progress);
+  const mapReady = states.filter(
+    (state) => progress.byState[state.abbreviation].mapCorrect >= 2
+  ).length;
+  const capitalReady = states.filter(
+    (state) => progress.byState[state.abbreviation].capitalCorrect >= 2
+  ).length;
+
+  return [
+    { label: "Overall Mastery", value: `${mastered}/${totalStates}` },
+    { label: "Map Ready", value: `${mapReady}/${totalStates}` },
+    { label: "Capital Ready", value: `${capitalReady}/${totalStates}` },
+    { label: "Regions Unlocked", value: `${progress.unlockedRegions.length}/${regions.length}` }
+  ];
+}
+
+export function getHotStreakStates(progress: ProgressData) {
+  return [...states]
+    .map((state) => ({
+      name: state.name,
+      streak: progress.byState[state.abbreviation].streak
+    }))
+    .filter((state) => state.streak > 0)
+    .sort((left, right) => right.streak - left.streak)
+    .slice(0, 4);
+}
+
+export function getParentQuickRecap(progress: ProgressData) {
+  const mastered = getMasteredCount(progress);
+  const weakState = getWeakStates(progress)[0];
+
+  return [
+    `${mastered}/50 states are now fully mastered.`,
+    weakState
+      ? `${weakState.name} still needs the next focused family rep.`
+      : "No obvious weak state is standing out right now.",
+    `Best streak reached ${progress.stats.bestStreak}.`
+  ];
+}
+
 export function getEarnedBadges(progress: ProgressData) {
   const badges = ["Season Kickoff"];
   const mastered = Object.values(progress.byState).filter(

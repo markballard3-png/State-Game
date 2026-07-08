@@ -7,11 +7,15 @@ import { CapitalQuiz } from "@/components/CapitalQuiz";
 import { ChampionshipMode } from "@/components/ChampionshipMode";
 import { ConferenceStandings } from "@/components/ConferenceStandings";
 import { DesktopDashboardLayout } from "@/components/DesktopDashboardLayout";
+import { CoachClipboard } from "@/components/CoachClipboard";
+import { DriveSituationPanel } from "@/components/DriveSituationPanel";
+import { DriveSummary } from "@/components/DriveSummary";
 import { FilmRoomPanel } from "@/components/FilmRoomPanel";
 import { FeedbackBanner } from "@/components/FeedbackBanner";
 import { GameModeSelector } from "@/components/GameModeSelector";
 import { MapQuiz } from "@/components/MapQuiz";
 import { OpeningKickoff } from "@/components/OpeningKickoff";
+import { NationalRankingPanel } from "@/components/NationalRankingPanel";
 import { ParentDashboard } from "@/components/ParentDashboard";
 import { PracticeFacilityPanel } from "@/components/PracticeFacilityPanel";
 import { ProgressTracker } from "@/components/ProgressTracker";
@@ -19,6 +23,7 @@ import { RecruitingBoard } from "@/components/RecruitingBoard";
 import { RivalryWeekMode } from "@/components/RivalryWeekMode";
 import { RoadTripMode } from "@/components/RoadTripMode";
 import { Scoreboard } from "@/components/Scoreboard";
+import { SeasonSchedule } from "@/components/SeasonSchedule";
 import { SeasonStatusPanel } from "@/components/SeasonStatusPanel";
 import { StateCard } from "@/components/StateCard";
 import { TeamCardCollection } from "@/components/TeamCardCollection";
@@ -30,9 +35,13 @@ import {
   getConferenceStandings,
   getEarnedBadges,
   getEarnedTrophies,
+  getModeAvailability,
+  getNationalRanking,
   isCorrectCapitalAnswer,
+  getMasteredCount,
   getNextPracticeLabel,
   getRank,
+  getSeasonObjectives,
   getStateByCode,
   getWeakStates,
   modeLabels,
@@ -61,6 +70,11 @@ export function GameClient() {
   );
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [driveYards, setDriveYards] = useState(0);
+  const [down, setDown] = useState(1);
+  const [yardsToGo, setYardsToGo] = useState(10);
+  const [playClock, setPlayClock] = useState(25);
+  const [recentPlays, setRecentPlays] = useState<string[]>([]);
   const [missesThisPrompt, setMissesThisPrompt] = useState(0);
   const [selectedState, setSelectedState] = useState(states[0]);
   const [seasonStarted, setSeasonStarted] = useState(false);
@@ -126,6 +140,102 @@ export function GameClient() {
     return () => window.removeEventListener("keydown", handleKeyboard);
   }, [hydrated]);
 
+  useEffect(() => {
+    if (!seasonStarted || activeMode === "dashboard") {
+      return;
+    }
+
+    if (!(difficulty >= 4 || activeMode === "championship")) {
+      return;
+    }
+
+    if (playClock <= 0) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPlayClock((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [playClock, seasonStarted, difficulty, activeMode]);
+
+  useEffect(() => {
+    if (playClock > 0 || !seasonStarted || activeMode === "dashboard") {
+      return;
+    }
+
+    setFeedback("Delay of game. The clock hit zero and the offense backed up.");
+    setFeedbackVariant("warning");
+    setRecentPlays((current) => ["Delay of game: 5-yard penalty", ...current].slice(0, 5));
+    setPlayClock(25);
+    setDriveYards((current) => Math.max(0, current - 5));
+    setYardsToGo((current) => current + 5);
+    setDown((current) => {
+      if (current >= 4) {
+        setRecentPlays((plays) => ["Turnover on downs after delay of game", ...plays].slice(0, 5));
+        setDriveYards(0);
+        setYardsToGo(10);
+        return 1;
+      }
+
+      return current + 1;
+    });
+  }, [playClock, seasonStarted, activeMode]);
+
+  function updateDrive({
+    gain,
+    playLabel,
+    wasCorrect
+  }: {
+    gain: number;
+    playLabel: string;
+    wasCorrect: boolean;
+  }) {
+    setPlayClock(25);
+    setRecentPlays((current) => [playLabel, ...current].slice(0, 5));
+
+    if (!wasCorrect) {
+      setDriveYards((current) => Math.max(0, current - gain));
+      setYardsToGo((current) => current + gain);
+      setDown((current) => {
+        if (current >= 4) {
+          setRecentPlays((plays) => ["Turnover on downs", ...plays].slice(0, 5));
+          setDriveYards(0);
+          setYardsToGo(10);
+          return 1;
+        }
+
+        return current + 1;
+      });
+      return;
+    }
+
+    setDriveYards((current) => {
+      const next = current + gain;
+      const touchdown = next >= 100;
+
+      if (touchdown) {
+        setRecentPlays((plays) => ["Touchdown drive finished", ...plays].slice(0, 5));
+        setDown(1);
+        setYardsToGo(10);
+        return 0;
+      }
+
+      setYardsToGo((currentYards) => {
+        if (gain >= currentYards) {
+          setDown(1);
+          return 10;
+        }
+
+        setDown((currentDown) => Math.min(4, currentDown + 1));
+        return Math.max(1, currentYards - gain);
+      });
+
+      return next;
+    });
+  }
+
   function advancePrompt(nextProgress = progress) {
     setPrompt(
       buildPrompt({
@@ -161,8 +271,15 @@ export function GameClient() {
     if (wasCorrect) {
       const points =
         prompt.questionType === "capital-typed" ? 10 : prompt.questionType === "map" ? 7 : 5;
+      const yards =
+        prompt.questionType === "capital-typed" ? 22 : prompt.questionType === "map" ? 15 : 10;
       setScore((current) => current + points + streak);
       setStreak((current) => current + 1);
+      updateDrive({
+        gain: yards,
+        playLabel: `${prompt.state.name}: ${yards}-yard gain on ${prompt.questionType}`,
+        wasCorrect: true
+      });
       setFeedback(
         `Touchdown. ${prompt.state.name} is locked in with ${prompt.state.capital}.`
       );
@@ -172,6 +289,11 @@ export function GameClient() {
     }
 
     setStreak(0);
+    updateDrive({
+      gain: 8,
+      playLabel: `${prompt.state.name}: lost 8 yards after a missed ${prompt.questionType}`,
+      wasCorrect: false
+    });
     setMissesThisPrompt((current) => current + 1);
     setFeedback(
       prompt.questionType === "map"
@@ -222,6 +344,13 @@ export function GameClient() {
     setFeedbackVariant(wasCorrect ? "success" : "warning");
     setScore((current) => current + (wasCorrect ? 20 : 3));
     setStreak((current) => (wasCorrect ? current + 2 : 0));
+    updateDrive({
+      gain: wasCorrect ? 30 : 10,
+      playLabel: wasCorrect
+        ? `${prompt.matchup.title}: 30-yard rivalry strike`
+        : `${prompt.matchup.title}: rivalry sack for loss`,
+      wasCorrect
+    });
     advancePrompt(nextProgress);
   }
 
@@ -240,6 +369,11 @@ export function GameClient() {
     setProgress(fresh);
     setScore(0);
     setStreak(0);
+    setDriveYards(0);
+    setDown(1);
+    setYardsToGo(10);
+    setPlayClock(25);
+    setRecentPlays([]);
     setFeedback("Fresh season started. Build momentum one state at a time.");
     setFeedbackVariant("neutral");
     setSeasonStarted(false);
@@ -273,6 +407,29 @@ export function GameClient() {
   const conferenceStandings = getConferenceStandings(progress);
   const weakStates = getWeakStates(progress);
   const nextPracticeLabel = getNextPracticeLabel(progress);
+  const nationalRanking = getNationalRanking(progress);
+  const seasonObjectives = getSeasonObjectives(progress);
+  const modeAvailability = getModeAvailability(progress);
+  const masteredCountForUnlocks = getMasteredCount(progress);
+  const quarterLabel =
+    score >= 180 ? "4th Quarter" : score >= 120 ? "3rd Quarter" : score >= 60 ? "2nd Quarter" : "1st Quarter";
+  const clipboardBullets = [
+    `Mastered states: ${masteredCountForUnlocks}/50`,
+    `Unlocked regions: ${progress.unlockedRegions.length}/${regions.length}`,
+    modeAvailability.championship.unlocked
+      ? "Championship Mode is live."
+      : modeAvailability.championship.reason
+  ];
+
+  function handleModeChange(mode: GameMode) {
+    if (!modeAvailability[mode].unlocked) {
+      setFeedback(modeAvailability[mode].reason);
+      setFeedbackVariant("warning");
+      return;
+    }
+
+    setActiveMode(mode);
+  }
 
   return (
     <AppShell>
@@ -292,7 +449,11 @@ export function GameClient() {
                 A football-first geography game built for private family practice.
               </p>
             </div>
-            <GameModeSelector activeMode={activeMode} onChange={setActiveMode} />
+            <GameModeSelector
+              activeMode={activeMode}
+              onChange={handleModeChange}
+              availability={modeAvailability}
+            />
             <PracticeFacilityPanel
               drillFocus={drillFocus}
               weakOnly={weakOnly}
@@ -303,6 +464,12 @@ export function GameClient() {
               progress={progress}
               activeMode={modeLabels[activeMode]}
               difficultyLabel={difficultyLabels[difficulty]}
+            />
+            <CoachClipboard bullets={clipboardBullets} />
+            <SeasonSchedule
+              regions={regions}
+              activeRegion={activeRegion}
+              unlockedRegions={progress.unlockedRegions}
             />
             <ProgressTracker
               activeRegion={activeRegion}
@@ -441,7 +608,12 @@ export function GameClient() {
               xp={progress.stats.xp}
               rank={getRank(progress)}
               accuracy={accuracy}
+              driveYards={driveYards}
+              quarterLabel={quarterLabel}
             />
+            <DriveSituationPanel down={down} yardsToGo={yardsToGo} playClock={playClock} />
+            <DriveSummary driveYards={driveYards} recentPlays={recentPlays} />
+            <NationalRankingPanel ranking={nationalRanking} objectives={seasonObjectives} />
             <ConferenceStandings standings={conferenceStandings} />
             <RewardTrack progress={progress} />
             <RecruitingBoard states={states} progress={progress} />

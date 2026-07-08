@@ -190,6 +190,10 @@ export function getRank(progress: ProgressData) {
   return "Walk-On";
 }
 
+export function getMasteredCount(progress: ProgressData) {
+  return Object.values(progress.byState).filter((entry) => entry.masteryScore >= 90).length;
+}
+
 export function getRecruitingTier(score: number) {
   if (score >= 90) return "5-Star Mastered States";
   if (score >= 70) return "4-Star Almost There";
@@ -335,6 +339,75 @@ export function getBowlName(region: Region) {
   };
 
   return names[region];
+}
+
+export function getNationalRanking(progress: ProgressData) {
+  const mastered = Object.values(progress.byState).filter(
+    (entry) => entry.masteryScore >= 90
+  ).length;
+  const accuracy = progress.stats.totalQuestions
+    ? Math.round((progress.stats.correctAnswers / progress.stats.totalQuestions) * 100)
+    : 0;
+  const score = mastered * 4 + accuracy + progress.stats.bestStreak;
+
+  if (score >= 290) return 1;
+  if (score >= 260) return 3;
+  if (score >= 230) return 7;
+  if (score >= 200) return 12;
+  if (score >= 170) return 18;
+  if (score >= 140) return 25;
+  return 40;
+}
+
+export function getSeasonObjectives(progress: ProgressData) {
+  const mastered = getMasteredCount(progress);
+
+  return [
+    {
+      label: "Unlock next region",
+      current: progress.unlockedRegions.length,
+      target: regions.length
+    },
+    {
+      label: "5-star states",
+      current: mastered,
+      target: 50
+    },
+    {
+      label: "Bowl trophies",
+      current: progress.stats.bowlTrophies,
+      target: 7
+    }
+  ];
+}
+
+export function getModeAvailability(progress: ProgressData) {
+  const mastered = getMasteredCount(progress);
+  const totalQuestions = progress.stats.totalQuestions;
+  const reviewCount = Object.values(progress.byState).filter(
+    (entry) => entry.missedAnswers > 0
+  ).length;
+
+  return {
+    practice: { unlocked: true, reason: "Always available" },
+    roadTrip: {
+      unlocked: progress.unlockedRegions.length >= 1,
+      reason: "Start with your first region"
+    },
+    rivalry: {
+      unlocked: totalQuestions >= 8,
+      reason: "Answer 8 total questions to unlock Rivalry Week"
+    },
+    bowl: {
+      unlocked: reviewCount >= 3,
+      reason: "Miss 3 states or capitals to unlock Bowl Review"
+    },
+    championship: {
+      unlocked: progress.unlockedRegions.length === regions.length && mastered >= 20,
+      reason: "Unlock all regions and master 20 states"
+    },
+    dashboard: { unlocked: true, reason: "Always available" }
+  };
 }
 
 export function getWeakStates(progress: ProgressData) {

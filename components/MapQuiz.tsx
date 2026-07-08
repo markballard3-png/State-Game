@@ -1,4 +1,5 @@
 import { ProgressData, StateInfo, StateProgress } from "@/types/game";
+import { HintLadderPanel } from "@/components/HintLadderPanel";
 import { InteractiveUSMap } from "@/components/InteractiveUSMap";
 import { StudyCuePanel } from "@/components/StudyCuePanel";
 
@@ -6,6 +7,7 @@ export function MapQuiz({
   targetState,
   states,
   misses,
+  hints,
   progress,
   stateProgress,
   onGuess
@@ -13,6 +15,7 @@ export function MapQuiz({
   targetState: StateInfo;
   states: StateInfo[];
   misses: number;
+  hints: string[];
   progress: ProgressData;
   stateProgress: StateProgress;
   onGuess: (guess: string) => void;
@@ -69,6 +72,7 @@ export function MapQuiz({
         progress={progress}
         onSelect={onGuess}
       />
+      <HintLadderPanel hints={hints} misses={misses} />
     </div>
   );
 }

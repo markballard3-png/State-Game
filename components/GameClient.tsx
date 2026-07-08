@@ -8,6 +8,7 @@ import { AppShell } from "@/components/AppShell";
 import { BowlGameReview } from "@/components/BowlGameReview";
 import { CapitalQuiz } from "@/components/CapitalQuiz";
 import { ChampionshipMode } from "@/components/ChampionshipMode";
+import { ChampionshipReadinessPanel } from "@/components/ChampionshipReadinessPanel";
 import { ConferenceStandings } from "@/components/ConferenceStandings";
 import { DesktopDashboardLayout } from "@/components/DesktopDashboardLayout";
 import { CoachClipboard } from "@/components/CoachClipboard";
@@ -17,6 +18,7 @@ import { FilmRoomPanel } from "@/components/FilmRoomPanel";
 import { FeedbackBanner } from "@/components/FeedbackBanner";
 import { FocusDeckPanel } from "@/components/FocusDeckPanel";
 import { GameModeSelector } from "@/components/GameModeSelector";
+import { DailyChallengePanel } from "@/components/DailyChallengePanel";
 import { HalftimeReport } from "@/components/HalftimeReport";
 import { KickoffMissionPanel } from "@/components/KickoffMissionPanel";
 import { MapQuiz } from "@/components/MapQuiz";
@@ -30,6 +32,7 @@ import { PracticeFacilityPanel } from "@/components/PracticeFacilityPanel";
 import { ProgressTracker } from "@/components/ProgressTracker";
 import { RecruitingBoard } from "@/components/RecruitingBoard";
 import { RecoveryCoachPanel } from "@/components/RecoveryCoachPanel";
+import { RegionVictoryPanel } from "@/components/RegionVictoryPanel";
 import { RegionBossPanel } from "@/components/RegionBossPanel";
 import { RivalryWeekMode } from "@/components/RivalryWeekMode";
 import { RivalryHistoryPanel } from "@/components/RivalryHistoryPanel";
@@ -50,10 +53,13 @@ import {
   buildPrompt,
   getAchievementSpotlight,
   getAdaptivePracticeInsights,
+  getChampionshipReadiness,
   getConferenceStandings,
+  getDailyChallenge,
   getEarnedBadges,
   getEarnedTrophies,
   getHalftimeSummary,
+  getHintLadder,
   getKickoffMissions,
   getModeAvailability,
   getMostMissedCapitals,
@@ -62,6 +68,7 @@ import {
   getNationalRanking,
   getRecoveryCoachTips,
   getRegionBossChallenge,
+  getRegionVictoryStatus,
   isCorrectCapitalAnswer,
   getMasteredCount,
   getNextPracticeLabel,
@@ -579,6 +586,7 @@ export function GameClient() {
   const halftimeSummary = getHalftimeSummary(progress);
   const practiceScript = getPracticeScript(progress);
   const adaptiveInsights = getAdaptivePracticeInsights(progress, activeRegion);
+  const dailyChallenge = getDailyChallenge(progress);
   const focusedState =
     forcedStateCode ? states.find((state) => state.abbreviation === forcedStateCode) ?? null : null;
   const kickoffMissions = getKickoffMissions({
@@ -592,7 +600,9 @@ export function GameClient() {
       : undefined
   });
   const achievementSpotlight = getAchievementSpotlight(progress);
+  const championshipReadiness = getChampionshipReadiness(progress);
   const regionBossChallenge = getRegionBossChallenge(progress, activeRegion);
+  const regionVictoryStatus = getRegionVictoryStatus(progress, activeRegion);
   const unlockPreview = getModeUnlockPreview(progress);
   const recoveryCoachTips = getRecoveryCoachTips({
     misses: missesThisPrompt,
@@ -616,6 +626,7 @@ export function GameClient() {
   const clipboardBullets = [
     `Mastered states: ${masteredCountForUnlocks}/50`,
     `Unlocked regions: ${progress.unlockedRegions.length}/${regions.length}`,
+    dailyChallenge.completed ? "Daily challenge cleared." : "Daily challenge still live.",
     focusedState
       ? `Focus state pinned: ${focusedState.name}`
       : "No focus state pinned right now.",
@@ -662,6 +673,12 @@ export function GameClient() {
               weakOnly={weakOnly}
               onDrillFocusChange={setDrillFocus}
               onWeakOnlyChange={setWeakOnly}
+            />
+            <DailyChallengePanel
+              title={dailyChallenge.title}
+              detail={dailyChallenge.detail}
+              progressLabel={dailyChallenge.progressLabel}
+              completed={dailyChallenge.completed}
             />
             <KickoffMissionPanel missions={kickoffMissions} />
             <SessionGoalsPanel
@@ -756,6 +773,12 @@ export function GameClient() {
             />
             <MomentumMomentsPanel moments={momentumMoments} />
             <AdaptiveInsightsPanel insights={adaptiveInsights} />
+            <RegionVictoryPanel
+              title={regionVictoryStatus.title}
+              detail={regionVictoryStatus.detail}
+              completedCount={regionVictoryStatus.completedCount}
+              currentStatus={regionVictoryStatus.currentStatus}
+            />
             <RegionBossPanel
               title={regionBossChallenge.title}
               detail={regionBossChallenge.detail}
@@ -813,6 +836,7 @@ export function GameClient() {
                     targetState={prompt.state}
                     states={states}
                     misses={missesThisPrompt}
+                    hints={getHintLadder(prompt.state, prompt.questionType)}
                     progress={progress}
                     stateProgress={progress.byState[prompt.state.abbreviation]}
                     onGuess={handleStandardAnswer}
@@ -821,6 +845,8 @@ export function GameClient() {
                   <CapitalQuiz
                     state={prompt.state}
                     progress={progress.byState[prompt.state.abbreviation]}
+                    misses={missesThisPrompt}
+                    hints={getHintLadder(prompt.state, prompt.questionType)}
                     options={prompt.options}
                     typed={prompt.questionType === "capital-typed"}
                     onSubmit={handleStandardAnswer}
@@ -893,6 +919,11 @@ export function GameClient() {
             <RivalryHistoryPanel history={rivalryHistory} />
             <RecoveryCoachPanel tips={recoveryCoachTips} />
             <FilmRoomPanel weakStates={weakStates} recommendation={nextPracticeLabel} />
+            <ChampionshipReadinessPanel
+              score={championshipReadiness.score}
+              summary={championshipReadiness.summary}
+              nextStep={championshipReadiness.nextStep}
+            />
             <AchievementSpotlightPanel
               headline={achievementSpotlight.headline}
               detail={achievementSpotlight.detail}

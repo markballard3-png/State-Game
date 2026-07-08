@@ -1,18 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { HintLadderPanel } from "@/components/HintLadderPanel";
 import { StudyCuePanel } from "@/components/StudyCuePanel";
 import { StateInfo, StateProgress } from "@/types/game";
 
 export function CapitalQuiz({
   state,
   progress,
+  misses,
+  hints,
   options,
   typed,
   onSubmit
 }: {
   state: StateInfo;
   progress: StateProgress;
+  misses: number;
+  hints: string[];
   options?: string[];
   typed: boolean;
   onSubmit: (answer: string) => void;
@@ -46,6 +51,7 @@ export function CapitalQuiz({
           showCapitalHint={showHint}
         />
       </div>
+      <HintLadderPanel hints={hints} misses={misses} />
       {typed ? (
         <form
           onSubmit={(event) => {

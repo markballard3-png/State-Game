@@ -1,10 +1,12 @@
 import {
+  getFamilyHuddleNotes,
   getParentStudyPlan,
   getRecommendedPractice,
   getRegionAccuracy,
   getRank,
   getReviewQueue
 } from "@/lib/game";
+import { FamilyHuddlePanel } from "@/components/FamilyHuddlePanel";
 import { ParentStudyPlan } from "@/components/ParentStudyPlan";
 import { ReviewQueuePanel } from "@/components/ReviewQueuePanel";
 import { regions, states } from "@/data/states";
@@ -40,6 +42,7 @@ export function ParentDashboard({
   const recommended = getRecommendedPractice(progress);
   const studyPlan = getParentStudyPlan(progress);
   const reviewQueue = getReviewQueue(progress).slice(0, 6);
+  const familyHuddleNotes = getFamilyHuddleNotes(progress);
 
   return (
     <section className="space-y-5">
@@ -106,6 +109,7 @@ export function ParentDashboard({
         <ParentStudyPlan plan={studyPlan} />
         <ReviewQueuePanel queue={reviewQueue} />
       </div>
+      <FamilyHuddlePanel notes={familyHuddleNotes} />
       <div className="flex justify-end">
         <button
           type="button"

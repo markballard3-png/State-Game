@@ -753,6 +753,101 @@ export function getRecoveryCoachTips({
   ];
 }
 
+export function getDailyChallenge(progress: ProgressData) {
+  const daySeed = new Date().toISOString().slice(0, 10);
+  const hash = daySeed.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const targetState = states[hash % states.length];
+  const entry = progress.byState[targetState.abbreviation];
+  const completed = entry.correctAnswers >= 3 || entry.masteryScore >= 70;
+
+  return {
+    title: `${targetState.name} Spotlight`,
+    detail: `Score three clean reps or push ${targetState.name} to 70% mastery today.`,
+    progressLabel: `${Math.min(entry.correctAnswers, 3)}/3 clean reps · ${entry.masteryScore}% mastery`,
+    completed
+  };
+}
+
+export function getHintLadder(state: StateInfo, questionType: string) {
+  if (questionType === "map") {
+    return [
+      `This state plays in the ${state.region}.`,
+      `Its code is ${state.abbreviation}.`,
+      `Neighbors: ${state.neighboringStates.join(", ") || "No bordering states"}.`
+    ];
+  }
+
+  return [
+    `Team anchor: ${state.primaryTeamAnchor}.`,
+    `Capital starts with ${state.capital[0]}.`,
+    `Memory hook: ${state.memoryHook}`
+  ];
+}
+
+export function getChampionshipReadiness(progress: ProgressData) {
+  const mastered = getMasteredCount(progress);
+  const accuracy = progress.stats.totalQuestions
+    ? Math.round((progress.stats.correctAnswers / progress.stats.totalQuestions) * 100)
+    : 0;
+  const regionsUnlocked = progress.unlockedRegions.length;
+  const reviewCount = Object.values(progress.byState).filter(
+    (entry) => entry.missedAnswers > 0
+  ).length;
+  const score = Math.min(100, mastered * 2 + accuracy / 2 + regionsUnlocked * 4 - reviewCount);
+
+  return {
+    score,
+    summary:
+      score >= 85
+        ? "The roster is close to title-game form."
+        : score >= 65
+          ? "The foundation is strong, but a few weak states still matter."
+          : "More reps are needed before the title run feels safe.",
+    nextStep:
+      mastered < 20
+        ? `Master ${20 - mastered} more states to strengthen the championship case.`
+        : accuracy < 80
+          ? "Raise overall accuracy above 80%."
+          : "Keep cleaning up review states and protect your streak."
+  };
+}
+
+export function getRegionVictoryStatus(progress: ProgressData, activeRegion: Region) {
+  const completedBowls = progress.trophies.filter((trophy) => trophy.includes("Bowl")).length;
+  const activeStates = states.filter((state) => state.region === activeRegion);
+  const cleared = activeStates.filter(
+    (state) => progress.byState[state.abbreviation].masteryScore >= 70
+  ).length;
+
+  return {
+    title: completedBowls > 0 ? "Conference banners are going up." : "First banner is still ahead.",
+    detail:
+      completedBowls > 0
+        ? "Completed regions now feed real season momentum."
+        : "Clear one full region at 70% mastery to earn the first bowl banner.",
+    completedCount: `${completedBowls}/${regions.length} regional bowls`,
+    currentStatus: `${activeRegion}: ${cleared}/${activeStates.length} at 70%+`
+  };
+}
+
+export function getFamilyHuddleNotes(progress: ProgressData) {
+  const weakState = getWeakStates(progress)[0];
+  const rank = getRank(progress);
+  const accuracy = progress.stats.totalQuestions
+    ? Math.round((progress.stats.correctAnswers / progress.stats.totalQuestions) * 100)
+    : 0;
+
+  return [
+    `Current rank: ${rank}. Keep sessions short and confident.`,
+    weakState
+      ? `${weakState.name} is still the best place for a calm recovery rep.`
+      : "No single state is dragging the session right now.",
+    accuracy >= 80
+      ? `Accuracy is strong at ${accuracy}%. Celebrate consistency today.`
+      : `Accuracy is ${accuracy}%. Slow down and favor retrieval over speed.`
+  ];
+}
+
 export function getEarnedBadges(progress: ProgressData) {
   const badges = ["Season Kickoff"];
   const mastered = Object.values(progress.byState).filter(

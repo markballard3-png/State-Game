@@ -22,7 +22,7 @@ export function GameModeSelector({
   return (
     <div className="space-y-3">
       <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
-        Start Your Season
+        Pick A Game Mode
       </p>
       <div className="grid gap-2">
         {modes.map((mode) => (

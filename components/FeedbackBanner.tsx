@@ -12,9 +12,9 @@ export function FeedbackBanner({
   } as const;
 
   const labels = {
-    neutral: "Film Room Note",
-    success: "Touchdown",
-    warning: "Whistle"
+    neutral: "Game Note",
+    success: "Correct",
+    warning: "Try Again"
   } as const;
 
   return (

@@ -12,12 +12,12 @@ import {
 } from "@/types/game";
 
 export const modeLabels: Record<GameMode, string> = {
-  practice: "Practice Facility",
-  roadTrip: "Road Trip Season",
-  rivalry: "Rivalry Week",
-  bowl: "Bowl Review",
-  championship: "Championship Mode",
-  dashboard: "Parent Dashboard"
+  practice: "Practice",
+  roadTrip: "Region Challenge",
+  rivalry: "Challenge Match",
+  bowl: "Review",
+  championship: "Final Challenge",
+  dashboard: "Grown-Up View"
 };
 
 export function getStateByCode(code: string) {
@@ -48,7 +48,7 @@ export function isCorrectCapitalAnswer(answer: string, capital: string) {
   return false;
 }
 
-export function buildCapitalOptions(target: StateInfo, pool: StateInfo[]) {
+export function buildCapitalOptions(target: StateInfo, pool: StateInfo[], optionCount = 4) {
   const sameRegion = pool.filter(
     (state) =>
       state.abbreviation !== target.abbreviation &&
@@ -61,7 +61,7 @@ export function buildCapitalOptions(target: StateInfo, pool: StateInfo[]) {
   );
 
   const distractors = shuffle([...sameRegion, ...fallback])
-    .slice(0, 3)
+    .slice(0, Math.max(0, optionCount - 1))
     .map((state) => state.capital);
 
   return shuffle([target.capital, ...distractors]);
@@ -135,7 +135,7 @@ export function buildPrompt({
 
   let pool = states;
 
-  if (mode === "practice" || mode === "roadTrip") {
+  if (mode === "roadTrip") {
     pool = states.filter((state) => state.region === activeRegion);
   }
 
@@ -163,7 +163,9 @@ export function buildPrompt({
       : undefined;
   const chosenState = forcedState ?? shuffle(weightedPool(pool, progress))[0];
   const questionType =
-    drillFocus === "mixed"
+    mode === "practice"
+      ? "map"
+      : drillFocus === "mixed"
       ? mode === "bowl"
         ? shuffle<QuestionType>(["map", "capital-choice", "capital-typed"])[0]
         : getQuestionType(difficulty)

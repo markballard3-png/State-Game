@@ -27,31 +27,24 @@ export function CapitalQuiz({
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-[1.1fr_0.9fr] gap-4">
-        <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
-            Call the Right Play
-          </p>
-          <h2 className="mt-2 text-4xl font-black">What is the capital of {state.name}?</h2>
-          <p className="mt-3 text-slate-300">{state.memoryHook}</p>
-          {typed ? (
-            <button
-              type="button"
-              onClick={() => setShowHint((current) => !current)}
-              className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-neon hover:text-white"
-            >
-              {showHint ? "Hide capital pattern" : "Reveal capital pattern"}
-            </button>
-          ) : null}
-        </div>
-        <StudyCuePanel
-          state={state}
-          progress={progress}
-          variant="capital"
-          showCapitalHint={showHint}
-        />
+      <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
+          Capital Question
+        </p>
+        <h2 className="mt-2 text-3xl font-black">What is the capital of {state.name}?</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Read the question, then choose the best answer.
+        </p>
+        {typed ? (
+          <button
+            type="button"
+            onClick={() => setShowHint((current) => !current)}
+            className="mt-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-neon hover:text-white"
+          >
+            {showHint ? "Hide hint" : "Show hint"}
+          </button>
+        ) : null}
       </div>
-      <HintLadderPanel hints={hints} misses={misses} />
       {typed ? (
         <form
           onSubmit={(event) => {
@@ -76,12 +69,12 @@ export function CapitalQuiz({
               type="submit"
               className="rounded-2xl bg-gold px-5 py-3 font-bold text-slate-950 transition hover:brightness-110"
             >
-              Snap It
+              Check Answer
             </button>
           </div>
         </form>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {options?.map((option) => (
             <button
               key={option}
@@ -90,13 +83,22 @@ export function CapitalQuiz({
                 onSubmit(option);
                 setShowHint(false);
               }}
-              className="rounded-[24px] border border-white/10 bg-slate-900/70 px-5 py-6 text-left transition hover:border-neon hover:bg-neon/10"
+              className="rounded-[24px] border border-white/10 bg-slate-900/70 px-5 py-6 text-left text-xl transition hover:border-neon hover:bg-neon/10"
             >
               <span className="text-lg font-bold">{option}</span>
             </button>
           ))}
         </div>
       )}
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <StudyCuePanel
+          state={state}
+          progress={progress}
+          variant="capital"
+          showCapitalHint={showHint}
+        />
+        <HintLadderPanel hints={hints} misses={misses} />
+      </div>
     </div>
   );
 }

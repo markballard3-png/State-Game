@@ -14,7 +14,7 @@ export function StateCard({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
-            NCAA Memory Card
+            State Card
           </p>
           <h3 className="mt-2 text-3xl font-black">
             {state.name} <span className="text-slate-500">{state.abbreviation}</span>
@@ -26,11 +26,11 @@ export function StateCard({
           <p className="text-3xl font-black text-neon">{progress.masteryScore}%</p>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 lg:grid-cols-2">
         <TeamThemeCard state={state} />
         <MemoryHookCard state={state} />
       </div>
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatPill label="Region" value={state.region} />
         <StatPill label="Correct" value={String(progress.correctAnswers)} />
         <StatPill label="Missed" value={String(progress.missedAnswers)} />

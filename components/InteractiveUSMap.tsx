@@ -1,15 +1,30 @@
-import { getRegionMastery } from "@/lib/game";
+import { geoPath } from "d3-geo";
+import { feature } from "topojson-client";
+import usAtlas from "us-atlas/states-albers-10m.json";
 import { ProgressData, StateInfo } from "@/types/game";
 
-const regionOrder = [
-  "Northeast Division",
-  "ACC / Atlantic Division",
-  "SEC South Division",
-  "Big Ten Midwest Division",
-  "Big 12 Plains Division",
-  "Mountain West Division",
-  "Pac-12 West Coast Division"
-] as const;
+const pathGenerator = geoPath();
+const atlasData = usAtlas as any;
+const statesFeatureCollection = feature(atlasData, atlasData.objects.states) as unknown as {
+  features: Array<{
+    id: string;
+    properties: { name: string };
+    geometry: unknown;
+  }>;
+};
+
+const stateNameToCode = new Map([
+  ["Alabama", "AL"], ["Alaska", "AK"], ["Arizona", "AZ"], ["Arkansas", "AR"], ["California", "CA"],
+  ["Colorado", "CO"], ["Connecticut", "CT"], ["Delaware", "DE"], ["Florida", "FL"], ["Georgia", "GA"],
+  ["Hawaii", "HI"], ["Idaho", "ID"], ["Illinois", "IL"], ["Indiana", "IN"], ["Iowa", "IA"],
+  ["Kansas", "KS"], ["Kentucky", "KY"], ["Louisiana", "LA"], ["Maine", "ME"], ["Maryland", "MD"],
+  ["Massachusetts", "MA"], ["Michigan", "MI"], ["Minnesota", "MN"], ["Mississippi", "MS"], ["Missouri", "MO"],
+  ["Montana", "MT"], ["Nebraska", "NE"], ["Nevada", "NV"], ["New Hampshire", "NH"], ["New Jersey", "NJ"],
+  ["New Mexico", "NM"], ["New York", "NY"], ["North Carolina", "NC"], ["North Dakota", "ND"], ["Ohio", "OH"],
+  ["Oklahoma", "OK"], ["Oregon", "OR"], ["Pennsylvania", "PA"], ["Rhode Island", "RI"], ["South Carolina", "SC"],
+  ["South Dakota", "SD"], ["Tennessee", "TN"], ["Texas", "TX"], ["Utah", "UT"], ["Vermont", "VT"],
+  ["Virginia", "VA"], ["Washington", "WA"], ["West Virginia", "WV"], ["Wisconsin", "WI"], ["Wyoming", "WY"]
+]);
 
 export function InteractiveUSMap({
   states,
@@ -24,74 +39,58 @@ export function InteractiveUSMap({
   progress: ProgressData;
   onSelect: (code: string) => void;
 }) {
+  const stateLookup = new Map(states.map((state) => [state.abbreviation, state]));
+
   return (
-    <section className="rounded-[28px] border border-white/10 bg-slate-900/60 p-5">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="rounded-[28px] border border-white/10 bg-slate-900/60 p-4">
+      <div className="mb-3 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
-            Stadium Map Drill
+            U.S. Map
           </p>
-          <h3 className="mt-2 text-2xl font-black">Interactive U.S. field map</h3>
+          <h3 className="mt-1 text-xl font-black">Tap the correct state</h3>
         </div>
-        <p className="max-w-xs text-right text-sm text-slate-400">
-          Click a state tile. After two misses, the correct region glows.
+        <p className="max-w-xs text-right text-xs text-slate-400">
+          Use the real U.S. map. After two misses, the target state glows.
         </p>
       </div>
-      <div className="grid grid-cols-3 gap-4">
-        {regionOrder.map((region) => (
-          <div
-            key={region}
-            className={`rounded-3xl border p-4 ${
-              highlightedRegion === region
-                ? "border-gold bg-gold/10 shadow-[0_0_0_1px_rgba(246,195,74,0.2),0_0_32px_rgba(246,195,74,0.12)]"
-                : "border-white/10 bg-white/5"
-            }`}
-          >
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                {region}
-              </p>
-              <span className="text-[11px] font-semibold text-slate-400">
-                {getRegionMastery(region, progress)}% mastery
-              </span>
-            </div>
-            <div className="mb-4 h-2 rounded-full bg-white/10">
-              <div
-                className="h-2 rounded-full bg-gradient-to-r from-gold to-neon"
-                style={{ width: `${getRegionMastery(region, progress)}%` }}
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {states
-                .filter((state) => state.region === region)
-                .map((state) => {
-                  const mastery = progress.byState[state.abbreviation].masteryScore;
+      <svg
+        viewBox="0 0 975 610"
+        className="h-[420px] w-full rounded-2xl bg-[#0f1630] lg:h-[500px]"
+        role="img"
+        aria-label="United States map"
+      >
+        {statesFeatureCollection.features.map((featureItem) => {
+          const code = stateNameToCode.get(featureItem.properties.name);
 
-                  return (
-                  <button
-                    key={state.abbreviation}
-                    type="button"
-                    onClick={() => onSelect(state.abbreviation)}
-                    className={`rounded-xl border px-2 py-3 text-sm font-bold transition ${
-                      targetState === state.abbreviation
-                        ? "border-neon bg-neon/10 text-white"
-                        : "border-white/10 bg-slate-950/50 text-slate-200 hover:border-white/20 hover:bg-white/10"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="block">{state.abbreviation}</span>
-                      <span className="text-[10px] text-slate-400">{mastery}%</span>
-                    </div>
-                    <span className="mt-1 block text-[11px] font-medium text-slate-400">
-                      {state.name}
-                    </span>
-                  </button>
-                  );
-                })}
-            </div>
-          </div>
-        ))}
-      </div>
+          if (!code) {
+            return null;
+          }
+
+          const state = stateLookup.get(code);
+
+          if (!state) {
+            return null;
+          }
+
+          const mastery = progress.byState[code].masteryScore;
+          const isTarget = targetState === code;
+          const isHighlightedRegion = highlightedRegion ? state.region === highlightedRegion : false;
+          const fill = isTarget ? "#2dd4bf" : mastery >= 85 ? "#2563eb" : mastery >= 60 ? "#334155" : "#1f2937";
+
+          return (
+            <path
+              key={featureItem.id}
+              d={pathGenerator(featureItem as never) ?? ""}
+              onClick={() => onSelect(code)}
+              className="cursor-pointer transition hover:fill-[#facc15]"
+              fill={fill}
+              stroke={isHighlightedRegion ? "#facc15" : "#94a3b8"}
+              strokeWidth={isTarget || isHighlightedRegion ? 2.25 : 1}
+            />
+          );
+        })}
+      </svg>
     </section>
   );
 }

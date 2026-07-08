@@ -6,11 +6,12 @@ import { AdaptiveInsightsPanel } from "@/components/AdaptiveInsightsPanel";
 import { AnswerHistoryPanel } from "@/components/AnswerHistoryPanel";
 import { AppShell } from "@/components/AppShell";
 import { BowlGameReview } from "@/components/BowlGameReview";
+import { CapitalChallengeModal } from "@/components/CapitalChallengeModal";
 import { CapitalQuiz } from "@/components/CapitalQuiz";
 import { ChampionshipMode } from "@/components/ChampionshipMode";
 import { ChampionshipReadinessPanel } from "@/components/ChampionshipReadinessPanel";
+import { ConfettiBurst } from "@/components/ConfettiBurst";
 import { ConferenceStandings } from "@/components/ConferenceStandings";
-import { DesktopDashboardLayout } from "@/components/DesktopDashboardLayout";
 import { CoachClipboard } from "@/components/CoachClipboard";
 import { ComebackPathPanel } from "@/components/ComebackPathPanel";
 import { DriveBonusPanel } from "@/components/DriveBonusPanel";
@@ -26,7 +27,6 @@ import { HalftimeReport } from "@/components/HalftimeReport";
 import { KickoffMissionPanel } from "@/components/KickoffMissionPanel";
 import { MapQuiz } from "@/components/MapQuiz";
 import { MomentumMomentsPanel } from "@/components/MomentumMomentsPanel";
-import { OpeningKickoff } from "@/components/OpeningKickoff";
 import { NationalRankingPanel } from "@/components/NationalRankingPanel";
 import { ParentDashboard } from "@/components/ParentDashboard";
 import { PersonalRecordsPanel } from "@/components/PersonalRecordsPanel";
@@ -51,7 +51,6 @@ import { SessionMilestonesPanel } from "@/components/SessionMilestonesPanel";
 import { SessionWrapPanel } from "@/components/SessionWrapPanel";
 import { SeasonStatusPanel } from "@/components/SeasonStatusPanel";
 import { StateCard } from "@/components/StateCard";
-import { TeamCardCollection } from "@/components/TeamCardCollection";
 import { TrophyCabinet } from "@/components/TrophyCabinet";
 import { UnlockPreviewPanel } from "@/components/UnlockPreviewPanel";
 import { ReviewQueuePanel } from "@/components/ReviewQueuePanel";
@@ -59,6 +58,7 @@ import { RewardTrack } from "@/components/RewardTrack";
 import { WeeklyGoalsPanel } from "@/components/WeeklyGoalsPanel";
 import { regions, states } from "@/data/states";
 import {
+  buildCapitalOptions,
   buildPrompt,
   getAchievementSpotlight,
   getAdaptivePracticeInsights,
@@ -94,7 +94,6 @@ import {
   getStateByCode,
   getWeakStates,
   getWeeklyGoals,
-  modeLabels,
   updateProgressForAnswer
 } from "@/lib/game";
 import { createInitialProgress, loadProgress, saveProgress } from "@/lib/storage";
@@ -107,6 +106,55 @@ import {
   Region
 } from "@/types/game";
 
+function getRoundSecondsForDifficulty(difficulty: DifficultyLevel) {
+  if (difficulty <= 1) return 7 * 60;
+  if (difficulty <= 2) return 5 * 60;
+  return 3 * 60;
+}
+
+function formatRoundTime(totalSeconds: number) {
+  const minutes = Math.max(0, Math.floor(totalSeconds / 60));
+  const seconds = Math.max(0, totalSeconds % 60);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function buildPracticePromptForCode({
+  code,
+  difficulty,
+  progress,
+  activeRegion,
+  drillFocus,
+  weakOnly
+}: {
+  code: string;
+  difficulty: DifficultyLevel;
+  progress: ProgressData;
+  activeRegion: Region;
+  drillFocus: DrillFocus;
+  weakOnly: boolean;
+}) {
+  return buildPrompt({
+    mode: "practice",
+    difficulty,
+    progress,
+    activeRegion,
+    drillFocus,
+    weakOnly,
+    forcedStateCode: code
+  });
+}
+
+function buildPracticeOrder() {
+  const codes = states.map((state) => state.abbreviation);
+
+  for (let index = codes.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [codes[index], codes[swapIndex]] = [codes[swapIndex], codes[index]];
+  }
+
+  return codes;
+}
+
 export function GameClient() {
   const [progress, setProgress] = useState<ProgressData>(createInitialProgress());
   const [hydrated, setHydrated] = useState(false);
@@ -114,7 +162,11 @@ export function GameClient() {
   const [activeRegion, setActiveRegion] = useState<Region>(regions[0]);
   const [difficulty, setDifficulty] = useState<DifficultyLevel>(1);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
-  const [feedback, setFeedback] = useState("Kick off the season and start building confidence.");
+  const [capitalChallenge, setCapitalChallenge] = useState<null | {
+    state: typeof states[number];
+    options: string[];
+  }>(null);
+  const [feedback, setFeedback] = useState("Press Start to begin the game.");
   const [feedbackVariant, setFeedbackVariant] = useState<"neutral" | "success" | "warning">(
     "neutral"
   );
@@ -127,7 +179,7 @@ export function GameClient() {
   const [recentPlays, setRecentPlays] = useState<string[]>([]);
   const [missesThisPrompt, setMissesThisPrompt] = useState(0);
   const [selectedState, setSelectedState] = useState(states[0]);
-  const [seasonStarted, setSeasonStarted] = useState(false);
+  const [seasonStarted] = useState(true);
   const [drillFocus, setDrillFocus] = useState<DrillFocus>("mixed");
   const [weakOnly, setWeakOnly] = useState(false);
   const [sessionQuestions, setSessionQuestions] = useState(0);
@@ -136,6 +188,10 @@ export function GameClient() {
   const [sessionHighScore, setSessionHighScore] = useState(0);
   const [sessionFocusSeconds, setSessionFocusSeconds] = useState(0);
   const [forcedStateCode, setForcedStateCode] = useState<string | null>(null);
+  const [roundSecondsRemaining, setRoundSecondsRemaining] = useState(420);
+  const [practiceRoundStarted, setPracticeRoundStarted] = useState(false);
+  const [practiceRemainingCodes, setPracticeRemainingCodes] = useState<string[]>([]);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [momentumMoments, setMomentumMoments] = useState<string[]>([
     "Season opened. Start stacking correct answers to build momentum."
   ]);
@@ -186,6 +242,13 @@ export function GameClient() {
       return;
     }
 
+    if (activeMode === "practice") {
+      if (!practiceRoundStarted) {
+        setPrompt(null);
+      }
+      return;
+    }
+
     setPrompt(
       buildPrompt({
         mode: activeMode,
@@ -197,7 +260,7 @@ export function GameClient() {
         forcedStateCode
       })
     );
-  }, [activeMode, difficulty, activeRegion, hydrated, drillFocus, weakOnly, forcedStateCode]);
+  }, [activeMode, difficulty, activeRegion, hydrated, drillFocus, weakOnly, forcedStateCode, practiceRoundStarted]);
 
   useEffect(() => {
     if (prompt?.kind === "standard") {
@@ -205,6 +268,49 @@ export function GameClient() {
       setMissesThisPrompt(0);
     }
   }, [prompt]);
+
+  useEffect(() => {
+    if (!hydrated || activeMode !== "practice") {
+      return;
+    }
+
+    setRoundSecondsRemaining(getRoundSecondsForDifficulty(difficulty));
+    setCapitalChallenge(null);
+    setPracticeRoundStarted(false);
+    setPracticeRemainingCodes([]);
+  }, [activeMode, difficulty, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || activeMode !== "practice" || !practiceRoundStarted || !prompt || roundSecondsRemaining <= 0) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setRoundSecondsRemaining((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeMode, hydrated, practiceRoundStarted, prompt, roundSecondsRemaining]);
+
+  useEffect(() => {
+    if (showConfetti) {
+      const timeoutId = window.setTimeout(() => setShowConfetti(false), 1400);
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [showConfetti]);
+
+  useEffect(() => {
+    if (activeMode !== "practice" || roundSecondsRemaining > 0) {
+      return;
+    }
+
+    setPrompt(null);
+    setCapitalChallenge(null);
+    setPracticeRoundStarted(false);
+    setPracticeRemainingCodes([]);
+    setFeedback("Time is up. Press Start to play again.");
+    setFeedbackVariant("warning");
+  }, [activeMode, roundSecondsRemaining]);
 
   useEffect(() => {
     if (!hydrated) {
@@ -220,7 +326,6 @@ export function GameClient() {
       if (event.key.toLowerCase() === "p") setActiveMode("practice");
       if (event.key.toLowerCase() === "r") setActiveMode("roadTrip");
       if (event.key.toLowerCase() === "b") setActiveMode("bowl");
-      if (event.key === " ") setSeasonStarted(true);
     }
 
     window.addEventListener("keydown", handleKeyboard);
@@ -339,6 +444,34 @@ export function GameClient() {
     setMissesThisPrompt(0);
   }
 
+  function advancePracticeQueue(nextProgress = progress) {
+    setPracticeRemainingCodes((current) => {
+      const remaining = current.slice(1);
+
+      if (remaining.length === 0) {
+        setPrompt(null);
+        setPracticeRoundStarted(false);
+        setCapitalChallenge(null);
+        setFeedback("Amazing job! You worked through all 50 states.");
+        setFeedbackVariant("success");
+        return [];
+      }
+
+      setPrompt(
+        buildPracticePromptForCode({
+          code: remaining[0],
+          difficulty,
+          progress: nextProgress,
+          activeRegion,
+          drillFocus,
+          weakOnly
+        })
+      );
+      setMissesThisPrompt(0);
+      return remaining;
+    });
+  }
+
   function addMomentumMoment(message: string) {
     setMomentumMoments((current) => [message, ...current].slice(0, 4));
   }
@@ -383,6 +516,46 @@ export function GameClient() {
     const currentStateProgress = progress.byState[prompt.state.abbreviation];
     const nextStateProgress = nextProgress.byState[prompt.state.abbreviation];
     const nextStreak = wasCorrect ? streak + 1 : 0;
+
+    if (prompt.questionType === "map" && activeMode === "practice") {
+      setProgress(nextProgress);
+      recordSessionResult(wasCorrect);
+      pushAnswerHistory(
+        prompt.state.name,
+        "map",
+        wasCorrect ? "correct" : "miss",
+        wasCorrect ? `Found ${prompt.state.name} on the U.S. map.` : `Missed ${prompt.state.name} on the U.S. map.`
+      );
+
+      if (wasCorrect) {
+        setScore((current) => current + 6 + streak);
+        setSessionBestStreak((current) => Math.max(current, nextStreak));
+        setStreak((current) => current + 1);
+        updateDrive({
+          gain: 12,
+          playLabel: `${prompt.state.name}: map found`,
+          wasCorrect: true
+        });
+        setFeedback(`Nice! Now choose the capital for ${prompt.state.name}.`);
+        setFeedbackVariant("neutral");
+        setCapitalChallenge({
+          state: prompt.state,
+          options: buildCapitalOptions(prompt.state, states, 3)
+        });
+        return;
+      }
+
+      setStreak(0);
+      updateDrive({
+        gain: 8,
+        playLabel: `${prompt.state.name}: missed on the map`,
+        wasCorrect: false
+      });
+      setMissesThisPrompt((current) => current + 1);
+      setFeedback("Try again on the map. After two misses, the answer will glow.");
+      setFeedbackVariant("warning");
+      return;
+    }
 
     setProgress(nextProgress);
     recordSessionResult(wasCorrect);
@@ -556,7 +729,6 @@ export function GameClient() {
     setRecentPlays([]);
     setFeedback("Fresh season started. Build momentum one state at a time.");
     setFeedbackVariant("neutral");
-    setSeasonStarted(false);
     setActiveMode("practice");
     setActiveRegion(regions[0]);
     setDifficulty(1);
@@ -568,6 +740,11 @@ export function GameClient() {
     setSessionHighScore(0);
     setSessionFocusSeconds(0);
     setForcedStateCode(null);
+    setRoundSecondsRemaining(getRoundSecondsForDifficulty(1));
+    setPracticeRoundStarted(false);
+    setPracticeRemainingCodes([]);
+    setCapitalChallenge(null);
+    setShowConfetti(false);
     setLongestDrive(0);
     setAnswerHistory([]);
     setMomentumMoments(["Fresh season started. New momentum will build from the next snap."]);
@@ -581,6 +758,11 @@ export function GameClient() {
     setSessionBestStreak(0);
     setSessionHighScore(0);
     setSessionFocusSeconds(0);
+    setRoundSecondsRemaining(getRoundSecondsForDifficulty(difficulty));
+    setPracticeRoundStarted(false);
+    setPracticeRemainingCodes([]);
+    setCapitalChallenge(null);
+    setShowConfetti(false);
     setLongestDrive(0);
     setAnswerHistory([]);
     setMomentumMoments(["New session started. Build another run of momentum."]);
@@ -602,11 +784,11 @@ export function GameClient() {
     .filter((state) => state.region === activeRegion)
     .every((state) => progress.byState[state.abbreviation].masteryScore >= 70);
   const difficultyLabels: Record<DifficultyLevel, string> = {
-    1: "Rookie",
-    2: "Starter",
-    3: "Captain",
-    4: "Bowl MVP",
-    5: "National Champion"
+    1: "Easy",
+    2: "Medium",
+    3: "Tricky",
+    4: "Hard",
+    5: "Expert"
   };
   const conferenceStandings = getConferenceStandings(progress);
   const weakStates = getWeakStates(progress);
@@ -625,7 +807,7 @@ export function GameClient() {
     sessionQuestions,
     sessionCorrect,
     streak,
-    focusedStateCode,
+    focusedStateCode: forcedStateCode,
     focusedStateMastery: focusedState
       ? progress.byState[focusedState.abbreviation].masteryScore
       : undefined
@@ -660,7 +842,6 @@ export function GameClient() {
     weakStates,
     focusedStateName: focusedState?.name ?? null
   });
-  const modeAvailability = getModeAvailability(progress);
   const masteredCountForUnlocks = getMasteredCount(progress);
   const sessionAccuracy = sessionQuestions
     ? Math.round((sessionCorrect / sessionQuestions) * 100)
@@ -669,28 +850,34 @@ export function GameClient() {
     (state) => progress.byState[state.abbreviation].masteryScore >= 90
   ).length;
   const quarterLabel =
-    score >= 180 ? "4th Quarter" : score >= 120 ? "3rd Quarter" : score >= 60 ? "2nd Quarter" : "1st Quarter";
-  const clipboardBullets = [
-    `Mastered states: ${masteredCountForUnlocks}/50`,
-    `Unlocked regions: ${progress.unlockedRegions.length}/${regions.length}`,
-    dailyChallenge.completed ? "Daily challenge cleared." : "Daily challenge still live.",
-    focusedState
-      ? `Focus state pinned: ${focusedState.name}`
-      : "No focus state pinned right now.",
-    modeAvailability.championship.unlocked
-      ? "Championship Mode is live."
-      : modeAvailability.championship.reason
+    score >= 180 ? "Stage 4" : score >= 120 ? "Stage 3" : score >= 60 ? "Stage 2" : "Stage 1";
+  const currentInstructions =
+    capitalChallenge
+      ? `Now choose the capital for ${capitalChallenge.state.name}.`
+      : prompt?.kind === "standard"
+      ? prompt.questionType === "map"
+        ? `Tap ${prompt.state.name} on the map.`
+        : `Answer the capital question for ${prompt.state.name}.`
+      : prompt?.kind === "rivalry"
+        ? "Read the challenge and pick the best answer."
+        : activeMode === "dashboard"
+          ? "This page is for grown-ups to review progress."
+          : "Press start and answer the next question.";
+
+  const currentGoal =
+    capitalChallenge
+      ? "Goal: pick the right capital city."
+      : prompt?.kind === "standard"
+      ? prompt.questionType === "map"
+        ? "Goal: find the correct state."
+        : "Goal: choose or type the correct capital."
+      : "Goal: finish the challenge.";
+  const simpleLevelOptions: Array<{ label: string; value: DifficultyLevel }> = [
+    { label: "Easy · 7 min", value: 1 },
+    { label: "Medium · 5 min", value: 2 },
+    { label: "Hard · 3 min", value: 4 }
   ];
-
-  function handleModeChange(mode: GameMode) {
-    if (!modeAvailability[mode].unlocked) {
-      setFeedback(modeAvailability[mode].reason);
-      setFeedbackVariant("warning");
-      return;
-    }
-
-    setActiveMode(mode);
-  }
+  const isStandardPrompt = prompt?.kind === "standard";
 
   function applyPracticePreset(preset: {
     drillFocus: DrillFocus;
@@ -705,207 +892,117 @@ export function GameClient() {
     setFeedbackVariant("neutral");
   }
 
+  function handleStartPractice() {
+    const nextQueue = buildPracticeOrder();
+
+    setActiveMode("practice");
+    setPracticeRoundStarted(true);
+    setPracticeRemainingCodes(nextQueue);
+    setRoundSecondsRemaining(getRoundSecondsForDifficulty(difficulty));
+    setForcedStateCode(null);
+    setCapitalChallenge(null);
+    setFeedback("Game started. Tap the correct state on the U.S. map.");
+    setFeedbackVariant("neutral");
+    setPrompt(
+      buildPracticePromptForCode({
+        code: nextQueue[0],
+        difficulty,
+        progress,
+        activeRegion,
+        drillFocus,
+        weakOnly
+      })
+    );
+    setMissesThisPrompt(0);
+  }
+
+  function handleCapitalChallengeAnswer(answer: string) {
+    if (!capitalChallenge) {
+      return;
+    }
+
+    const wasCorrect = isCorrectCapitalAnswer(answer, capitalChallenge.state.capital);
+    const nextProgress = updateProgressForAnswer({
+      progress,
+      stateCode: capitalChallenge.state.abbreviation,
+      questionType: "capital-choice",
+      wasCorrect
+    });
+    const nextStreak = wasCorrect ? streak + 1 : 0;
+
+    setProgress(nextProgress);
+    recordSessionResult(wasCorrect);
+    pushAnswerHistory(
+      capitalChallenge.state.name,
+      "capital-choice",
+      wasCorrect ? "correct" : "miss",
+      wasCorrect ? `Capital locked in: ${capitalChallenge.state.capital}.` : `Missed the capital for ${capitalChallenge.state.name}.`
+    );
+
+    if (wasCorrect) {
+      setScore((current) => current + 10 + streak);
+      setSessionBestStreak((current) => Math.max(current, nextStreak));
+      setStreak((current) => current + 1);
+      updateDrive({
+        gain: 18,
+        playLabel: `${capitalChallenge.state.name}: capital answer locked in`,
+        wasCorrect: true
+      });
+      setFeedback(`Correct! ${capitalChallenge.state.capital} is the capital of ${capitalChallenge.state.name}.`);
+      setFeedbackVariant("success");
+      setCapitalChallenge(null);
+      setShowConfetti(true);
+      advancePracticeQueue(nextProgress);
+      return;
+    }
+
+    setStreak(0);
+    updateDrive({
+      gain: 6,
+      playLabel: `${capitalChallenge.state.name}: missed capital follow-up`,
+      wasCorrect: false
+    });
+    setFeedback(`Not quite. Try the capital question for ${capitalChallenge.state.name} again.`);
+    setFeedbackVariant("warning");
+    setCapitalChallenge({
+      state: capitalChallenge.state,
+      options: buildCapitalOptions(capitalChallenge.state, states, 3)
+    });
+  }
+
   return (
     <AppShell>
-      <div className="relative">
-        {!seasonStarted ? <OpeningKickoff onStart={() => setSeasonStarted(true)} /> : null}
-        <DesktopDashboardLayout
-        left={
-          <div className="scrollbar-thin flex h-full flex-col gap-6 overflow-y-auto">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
-                Capital Kickoff
-              </p>
-              <h1 className="mt-3 font-display text-3xl font-black leading-tight">
-                NCAA State Stadium Challenge
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                A football-first geography game built for private family practice.
-              </p>
-            </div>
-            <GameModeSelector
-              activeMode={activeMode}
-              onChange={handleModeChange}
-              availability={modeAvailability}
-            />
-            <PracticeFacilityPanel
-              drillFocus={drillFocus}
-              weakOnly={weakOnly}
-              onDrillFocusChange={setDrillFocus}
-              onWeakOnlyChange={setWeakOnly}
-            />
-            <PracticePresetPanel onApplyPreset={applyPracticePreset} />
-            <DailyChallengePanel
-              title={dailyChallenge.title}
-              detail={dailyChallenge.detail}
-              progressLabel={dailyChallenge.progressLabel}
-              completed={dailyChallenge.completed}
-            />
-            <KickoffMissionPanel missions={kickoffMissions} />
-            <FocusTimerPanel
-              seconds={sessionFocusSeconds}
-              label={sessionFocusSeconds >= 900 ? "Strong focus block." : "Build toward a 15-minute block."}
-            />
-            <SessionGoalsPanel
-              sessionQuestions={sessionQuestions}
-              sessionCorrect={sessionCorrect}
-              streak={streak}
-              focusedStateName={focusedState?.name ?? null}
-              focusedStateMastery={
-                focusedState ? progress.byState[focusedState.abbreviation].masteryScore : undefined
-              }
-            />
-            <SeasonStatusPanel
-              progress={progress}
-              activeMode={modeLabels[activeMode]}
-              difficultyLabel={difficultyLabels[difficulty]}
-            />
-            <PersonalRecordsPanel
-              sessionBestStreak={sessionBestStreak}
-              bestStreak={progress.stats.bestStreak}
-              sessionHighScore={sessionHighScore}
-              longestDrive={longestDrive}
-              masteredTotal={masteredCountForUnlocks}
-            />
-            <CoachClipboard bullets={clipboardBullets} />
-            <SeasonSchedule
-              regions={regions}
-              activeRegion={activeRegion}
-              unlockedRegions={progress.unlockedRegions}
-            />
-            <ProgressTracker
-              activeRegion={activeRegion}
-              onRegionChange={setActiveRegion}
-              progress={progress}
-            />
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Difficulty
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-2">
-                {(Object.entries(difficultyLabels) as Array<[string, string]>).map(([level, label]) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setDifficulty(Number(level) as DifficultyLevel)}
-                    className={`rounded-2xl border px-3 py-2 text-left text-sm ${
-                      difficulty === Number(level)
-                        ? "border-neon bg-neon/10 text-white"
-                        : "border-white/10 bg-slate-950/50 text-slate-300"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+      <div className="relative mx-auto max-w-[1180px]">
+        <div className={`grid gap-4 ${isStandardPrompt ? "min-h-[calc(100vh-3rem)]" : ""}`}>
+          <header className="rounded-[28px] border border-white/10 bg-slate-950/75 p-5 shadow-panel backdrop-blur">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
+                  State Game
+                </p>
+                <h1 className="mt-2 text-3xl font-black leading-tight text-white">
+                  One question at a time
+                </h1>
+                <p className="mt-2 text-sm text-slate-300">
+                  {currentInstructions}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-neon">{currentGoal}</p>
               </div>
-            </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Keyboard Shortcuts
-              </p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
-                1-5 difficulty, P practice, R road trip, B bowl review, Space start season.
-              </p>
-            </div>
-          </div>
-        }
-        center={
-          <div className="scrollbar-thin flex h-full flex-col gap-5 overflow-y-auto">
-            <header className="rounded-[28px] border border-white/10 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 p-6">
-              <div className="flex items-start justify-between gap-6">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">
-                    {modeLabels[activeMode]}
-                  </p>
-                  <h2 className="mt-3 text-4xl font-black leading-tight">
-                    Start your season and build football-powered memory.
-                  </h2>
-                  <p className="mt-3 text-sm leading-6 text-slate-300">
-                    Score touchdowns by locating states, calling capitals, and surviving rivalry week.
-                  </p>
-                </div>
+              <div className="max-w-md">
                 <FeedbackBanner message={feedback} variant={feedbackVariant} />
               </div>
-            </header>
-            <SessionWrapPanel
-              visible={sessionQuestions >= 10}
-              sessionQuestions={sessionQuestions}
-              sessionAccuracy={sessionAccuracy}
-              sessionBestStreak={sessionBestStreak}
-              masteredThisSession={masteredCountSessionView}
-              headline={momentumMoments[0] ?? "Keep building the next drive."}
-              onResetSession={resetSessionLayer}
-            />
-            <MomentumMomentsPanel moments={momentumMoments} />
-            <AdaptiveInsightsPanel insights={adaptiveInsights} />
-            <SessionMilestonesPanel milestones={sessionMilestones} />
-            <RegionVictoryPanel
-              title={regionVictoryStatus.title}
-              detail={regionVictoryStatus.detail}
-              completedCount={regionVictoryStatus.completedCount}
-              currentStatus={regionVictoryStatus.currentStatus}
-            />
-            <RegionBossPanel
-              title={regionBossChallenge.title}
-              detail={regionBossChallenge.detail}
-              progressLabel={regionBossChallenge.progressLabel}
-              weakestState={regionBossChallenge.weakestState}
-            />
-            <WeeklyGoalsPanel goals={weeklyGoals} />
+            </div>
+          </header>
 
-            {activeMode === "roadTrip" ? (
-              <RoadTripMode
-                region={activeRegion}
-                regionCompleted={regionCompleted}
-                progress={progress}
-                regionStates={states.filter((state) => state.region === activeRegion)}
-              />
-            ) : null}
-            {activeMode === "bowl" ? (
-              <BowlGameReview
-                reviewCount={reviewCount}
-                reviewStates={weakStates}
-              />
-            ) : null}
-            {activeMode === "championship" ? (
-              <ChampionshipMode
-                masteredCount={masteredCount}
-                accuracy={accuracy}
-                reviewCount={reviewCount}
-              />
-            ) : null}
-
-            {activeMode === "dashboard" ? (
-              <ParentDashboard progress={progress} onResetProgress={handleResetProgress} />
-            ) : prompt?.kind === "rivalry" ? (
-              (() => {
-                const left = getStateByCode(prompt.matchup.states[0]);
-                const right = getStateByCode(prompt.matchup.states[1]);
-
-                if (!left || !right) {
-                  return null;
-                }
-
-                return (
-                  <RivalryWeekMode
-                    leftState={left}
-                    rightState={right}
-                    bonusQuestion={prompt.matchup.bonusQuestion}
-                    bonusAnswer={prompt.matchup.bonusAnswer}
-                    onComplete={handleRivalryResult}
-                  />
-                );
-              })()
-            ) : prompt?.kind === "standard" ? (
-              <>
+          {isStandardPrompt ? (
+            <section className="relative grid flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+              <main className="rounded-[28px] border border-white/10 bg-slate-950/75 p-5 shadow-panel backdrop-blur">
                 {prompt.questionType === "map" ? (
                   <MapQuiz
                     targetState={prompt.state}
                     states={states}
                     misses={missesThisPrompt}
-                    hints={getHintLadder(prompt.state, prompt.questionType)}
                     progress={progress}
-                    stateProgress={progress.byState[prompt.state.abbreviation]}
                     onGuess={handleStandardAnswer}
                   />
                 ) : (
@@ -919,107 +1016,156 @@ export function GameClient() {
                     onSubmit={handleStandardAnswer}
                   />
                 )}
-                <StateCard
-                  state={selectedState}
-                  progress={progress.byState[selectedState.abbreviation]}
+              </main>
+              <aside className="grid gap-4">
+                <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-4 shadow-panel backdrop-blur">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    Level
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {simpleLevelOptions.map(({ label, value }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setDifficulty(value)}
+                        className={`rounded-2xl border px-4 py-2 text-sm font-semibold ${
+                          difficulty === value
+                            ? "border-neon bg-neon/10 text-white"
+                            : "border-white/10 bg-slate-950/50 text-slate-300"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleStartPractice}
+                    className="mt-4 w-full rounded-3xl bg-gold px-5 py-3 text-base font-black text-slate-950 transition hover:brightness-110"
+                  >
+                    Start
+                  </button>
+                </div>
+                <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-4 shadow-panel backdrop-blur">
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Time</p>
+                      <p className="mt-1 text-2xl font-black text-gold">
+                        {activeMode === "practice" && practiceRoundStarted
+                          ? formatRoundTime(roundSecondsRemaining)
+                          : "--:--"}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Score</p>
+                      <p className="mt-1 text-2xl font-black text-white">{score}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Streak</p>
+                      <p className="mt-1 text-2xl font-black text-white">{streak}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Correct</p>
+                      <p className="mt-1 text-2xl font-black text-white">{accuracy}%</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">How to Play</p>
+                    <p className="mt-2 text-sm text-slate-200">
+                      Press Start, tap the state on the map, then pick its capital.
+                    </p>
+                  </div>
+                </div>
+              </aside>
+              {capitalChallenge ? (
+                <CapitalChallengeModal
+                  stateName={capitalChallenge.state.name}
+                  options={capitalChallenge.options}
+                  onChoose={handleCapitalChallengeAnswer}
                 />
-                <TeamCardCollection
-                  states={states}
-                  progress={progress}
-                  onSelect={setSelectedState}
+              ) : null}
+              {showConfetti ? <ConfettiBurst /> : null}
+            </section>
+          ) : (
+            <>
+              <main className="rounded-[28px] border border-white/10 bg-slate-950/75 p-6 shadow-panel backdrop-blur">
+                <SessionWrapPanel
+                  visible={sessionQuestions >= 10}
+                  sessionQuestions={sessionQuestions}
+                  sessionAccuracy={sessionAccuracy}
+                  sessionBestStreak={sessionBestStreak}
+                  masteredThisSession={masteredCountSessionView}
+                  headline={momentumMoments[0] ?? "Keep going."}
+                  onResetSession={resetSessionLayer}
                 />
-              </>
-            ) : null}
-          </div>
-        }
-        right={
-          <div className="scrollbar-thin flex h-full flex-col gap-5 overflow-y-auto">
-            <Scoreboard
-              score={score}
-              streak={streak}
-              xp={progress.stats.xp}
-              rank={getRank(progress)}
-              accuracy={accuracy}
-              driveYards={driveYards}
-              quarterLabel={quarterLabel}
-            />
-            <PressurePanel headline={pressureSummary.headline} detail={pressureSummary.detail} />
-            <DriveSituationPanel down={down} yardsToGo={yardsToGo} playClock={playClock} />
-            <DriveSummary driveYards={driveYards} recentPlays={recentPlays} />
-            <DriveBonusPanel bonuses={driveBonuses} />
-            <HalftimeReport
-              summary={halftimeSummary}
-              score={score}
-              streak={progress.stats.bestStreak}
-              accuracy={accuracy}
-            />
-            <NationalRankingPanel ranking={nationalRanking} objectives={seasonObjectives} />
-            <ConferenceStandings standings={conferenceStandings} />
-            <RewardTrack progress={progress} />
-            <RecruitingBoard states={states} progress={progress} />
-            <PlaybookPanel
-              script={practiceScript}
-              mapTargets={mapTargets}
-              capitalTargets={capitalTargets}
-            />
-            <ReviewQueuePanel queue={reviewQueue.slice(0, 5)} />
-            <AnswerHistoryPanel history={answerHistory} />
-            <HotStreakStatesPanel states={hotStreakStates} />
-            <FocusDeckPanel
-              queue={reviewQueue.slice(0, 3)}
-              focusedStateCode={forcedStateCode}
-              onFocusState={(stateCode) => {
-                setForcedStateCode(stateCode);
-                const state = getStateByCode(stateCode);
 
-                if (state) {
-                  setSelectedState(state);
-                  addMomentumMoment(`${state.name} moved into the focus deck.`);
-                  setFeedback(`Focused rep loaded for ${state.name}. It will stay in the next prompt rotation.`);
-                  setFeedbackVariant("neutral");
-                }
-              }}
-              onClearFocus={() => {
-                setForcedStateCode(null);
-                setFeedback("Focus deck cleared. Prompt rotation is back to normal.");
-                setFeedbackVariant("neutral");
-              }}
-            />
-            <UnlockPreviewPanel items={unlockPreview} />
-            <RivalryHistoryPanel history={rivalryHistory} />
-            <ComebackPathPanel steps={comebackPath} />
-            <RecoveryCoachPanel tips={recoveryCoachTips} />
-            <FilmRoomPanel weakStates={weakStates} recommendation={nextPracticeLabel} />
-            <MasteryRadarPanel items={masteryRadar} />
-            <ChampionshipReadinessPanel
-              score={championshipReadiness.score}
-              summary={championshipReadiness.summary}
-              nextStep={championshipReadiness.nextStep}
-            />
-            <AchievementSpotlightPanel
-              headline={achievementSpotlight.headline}
-              detail={achievementSpotlight.detail}
-              nextTarget={achievementSpotlight.nextTarget}
-            />
-            <TrophyCabinet trophies={progress.trophies} />
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Next Challenge
-              </p>
-              <p className="mt-3 text-lg font-bold text-white">
-                {prompt?.kind === "standard"
-                  ? prompt.state.footballNickname
-                  : prompt?.kind === "rivalry"
-                    ? prompt.matchup.title
-                    : "Kickoff warm-up"}
-              </p>
-              <p className="mt-2 text-sm text-slate-300">
-                Weak states roll into Bowl Review. Mastered states move toward 5-star status.
-              </p>
-            </div>
-          </div>
-        }
-        />
+                {activeMode === "roadTrip" ? (
+                  <RoadTripMode
+                    region={activeRegion}
+                    regionCompleted={regionCompleted}
+                    progress={progress}
+                    regionStates={states.filter((state) => state.region === activeRegion)}
+                  />
+                ) : null}
+                {activeMode === "bowl" ? (
+                  <BowlGameReview reviewCount={reviewCount} reviewStates={weakStates} />
+                ) : null}
+                {activeMode === "championship" ? (
+                  <ChampionshipMode
+                    masteredCount={masteredCount}
+                    accuracy={accuracy}
+                    reviewCount={reviewCount}
+                  />
+                ) : null}
+
+                {activeMode === "dashboard" ? (
+                  <ParentDashboard progress={progress} onResetProgress={handleResetProgress} />
+                ) : prompt?.kind === "rivalry" ? (
+                  (() => {
+                    const left = getStateByCode(prompt.matchup.states[0]);
+                    const right = getStateByCode(prompt.matchup.states[1]);
+
+                    if (!left || !right) {
+                      return null;
+                    }
+
+                    return (
+                      <RivalryWeekMode
+                        leftState={left}
+                        rightState={right}
+                        bonusQuestion={prompt.matchup.bonusQuestion}
+                        bonusAnswer={prompt.matchup.bonusAnswer}
+                        onComplete={handleRivalryResult}
+                      />
+                    );
+                  })()
+                ) : (
+                  <div className="flex min-h-[320px] items-center justify-center">
+                    <div className="w-full max-w-xl rounded-[28px] border border-white/10 bg-white/5 p-8 text-center">
+                      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
+                        Ready To Play
+                      </p>
+                      <h2 className="mt-3 text-3xl font-black text-white">
+                        Start your next question
+                      </h2>
+                      <p className="mt-3 text-sm leading-6 text-slate-300">
+                        Press Start to begin on the U.S. map.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleStartPractice}
+                        className="mt-6 rounded-3xl bg-gold px-8 py-4 text-lg font-black text-slate-950 transition hover:brightness-110"
+                      >
+                        Start
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </main>
+            </>
+          )}
+
+        </div>
       </div>
     </AppShell>
   );

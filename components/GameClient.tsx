@@ -13,10 +13,12 @@ import { DriveSummary } from "@/components/DriveSummary";
 import { FilmRoomPanel } from "@/components/FilmRoomPanel";
 import { FeedbackBanner } from "@/components/FeedbackBanner";
 import { GameModeSelector } from "@/components/GameModeSelector";
+import { HalftimeReport } from "@/components/HalftimeReport";
 import { MapQuiz } from "@/components/MapQuiz";
 import { OpeningKickoff } from "@/components/OpeningKickoff";
 import { NationalRankingPanel } from "@/components/NationalRankingPanel";
 import { ParentDashboard } from "@/components/ParentDashboard";
+import { PlaybookPanel } from "@/components/PlaybookPanel";
 import { PracticeFacilityPanel } from "@/components/PracticeFacilityPanel";
 import { ProgressTracker } from "@/components/ProgressTracker";
 import { RecruitingBoard } from "@/components/RecruitingBoard";
@@ -28,6 +30,7 @@ import { SeasonStatusPanel } from "@/components/SeasonStatusPanel";
 import { StateCard } from "@/components/StateCard";
 import { TeamCardCollection } from "@/components/TeamCardCollection";
 import { TrophyCabinet } from "@/components/TrophyCabinet";
+import { ReviewQueuePanel } from "@/components/ReviewQueuePanel";
 import { RewardTrack } from "@/components/RewardTrack";
 import { regions, states } from "@/data/states";
 import {
@@ -35,12 +38,17 @@ import {
   getConferenceStandings,
   getEarnedBadges,
   getEarnedTrophies,
+  getHalftimeSummary,
   getModeAvailability,
+  getMostMissedCapitals,
+  getMostMissedMapStates,
   getNationalRanking,
   isCorrectCapitalAnswer,
   getMasteredCount,
   getNextPracticeLabel,
+  getPracticeScript,
   getRank,
+  getReviewQueue,
   getSeasonObjectives,
   getStateByCode,
   getWeakStates,
@@ -406,7 +414,12 @@ export function GameClient() {
   };
   const conferenceStandings = getConferenceStandings(progress);
   const weakStates = getWeakStates(progress);
+  const reviewQueue = getReviewQueue(progress);
+  const mapTargets = getMostMissedMapStates(progress);
+  const capitalTargets = getMostMissedCapitals(progress);
   const nextPracticeLabel = getNextPracticeLabel(progress);
+  const halftimeSummary = getHalftimeSummary(progress);
+  const practiceScript = getPracticeScript(progress);
   const nationalRanking = getNationalRanking(progress);
   const seasonObjectives = getSeasonObjectives(progress);
   const modeAvailability = getModeAvailability(progress);
@@ -577,11 +590,13 @@ export function GameClient() {
                     states={states}
                     misses={missesThisPrompt}
                     progress={progress}
+                    stateProgress={progress.byState[prompt.state.abbreviation]}
                     onGuess={handleStandardAnswer}
                   />
                 ) : (
                   <CapitalQuiz
                     state={prompt.state}
+                    progress={progress.byState[prompt.state.abbreviation]}
                     options={prompt.options}
                     typed={prompt.questionType === "capital-typed"}
                     onSubmit={handleStandardAnswer}
@@ -613,10 +628,22 @@ export function GameClient() {
             />
             <DriveSituationPanel down={down} yardsToGo={yardsToGo} playClock={playClock} />
             <DriveSummary driveYards={driveYards} recentPlays={recentPlays} />
+            <HalftimeReport
+              summary={halftimeSummary}
+              score={score}
+              streak={progress.stats.bestStreak}
+              accuracy={accuracy}
+            />
             <NationalRankingPanel ranking={nationalRanking} objectives={seasonObjectives} />
             <ConferenceStandings standings={conferenceStandings} />
             <RewardTrack progress={progress} />
             <RecruitingBoard states={states} progress={progress} />
+            <PlaybookPanel
+              script={practiceScript}
+              mapTargets={mapTargets}
+              capitalTargets={capitalTargets}
+            />
+            <ReviewQueuePanel queue={reviewQueue.slice(0, 5)} />
             <FilmRoomPanel weakStates={weakStates} recommendation={nextPracticeLabel} />
             <TrophyCabinet trophies={progress.trophies} />
             <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">

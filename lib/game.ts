@@ -423,6 +423,30 @@ export function getWeakStates(progress: ProgressData) {
     .slice(0, 4);
 }
 
+export function getMostMissedCapitals(progress: ProgressData) {
+  return [...states]
+    .sort(
+      (left, right) =>
+        progress.byState[right.abbreviation].capitalMissed -
+        progress.byState[left.abbreviation].capitalMissed ||
+        progress.byState[right.abbreviation].missedAnswers -
+          progress.byState[left.abbreviation].missedAnswers
+    )
+    .slice(0, 4);
+}
+
+export function getMostMissedMapStates(progress: ProgressData) {
+  return [...states]
+    .sort(
+      (left, right) =>
+        progress.byState[right.abbreviation].mapMissed -
+        progress.byState[left.abbreviation].mapMissed ||
+        progress.byState[right.abbreviation].missedAnswers -
+          progress.byState[left.abbreviation].missedAnswers
+    )
+    .slice(0, 4);
+}
+
 export function getConferenceStandings(progress: ProgressData) {
   return regions.map((region) => {
     const regionStates = states.filter((state) => state.region === region);
@@ -447,6 +471,96 @@ export function getNextPracticeLabel(progress: ProgressData) {
   }
 
   return `${weakest.name} and ${weakest.capital} need the next rep.`;
+}
+
+export function getHalftimeSummary(progress: ProgressData) {
+  const totalQuestions = progress.stats.totalQuestions;
+  const accuracy = totalQuestions
+    ? Math.round((progress.stats.correctAnswers / totalQuestions) * 100)
+    : 0;
+  const mastered = getMasteredCount(progress);
+
+  if (totalQuestions < 8) {
+    return "Early drive. Keep stacking reps to build your scouting report.";
+  }
+
+  if (accuracy >= 85 && mastered >= 10) {
+    return "Halftime lead. The offense is sharp and the season is trending up.";
+  }
+
+  if (accuracy >= 70) {
+    return "Competitive game. A few weak states need extra film-room work.";
+  }
+
+  return "Tough first half. Slow down, use the memory hooks, and attack weak regions.";
+}
+
+export function getPracticeScript(progress: ProgressData) {
+  const weakMap = getMostMissedMapStates(progress)[0];
+  const weakCapital = getMostMissedCapitals(progress)[0];
+  const weakState = getWeakStates(progress)[0];
+
+  return [
+    weakMap
+      ? `Map drill first: revisit ${weakMap.name} and its neighbors.`
+      : "Map drill first: keep building state-location reps.",
+    weakCapital
+      ? `Capital call: quiz ${weakCapital.capital} until recall feels automatic.`
+      : "Capital call: keep rotating multiple-choice and typed capitals.",
+    weakState
+      ? `Memory hook: say '${weakState.memoryHook}' before the next snap.`
+      : "Memory hook: use the team anchor before each answer."
+  ];
+}
+
+export function getReviewQueue(progress: ProgressData) {
+  return [...states]
+    .sort((left, right) => {
+      const leftEntry = progress.byState[left.abbreviation];
+      const rightEntry = progress.byState[right.abbreviation];
+      const leftPriority =
+        leftEntry.mapMissed + leftEntry.capitalMissed + leftEntry.missedAnswers;
+      const rightPriority =
+        rightEntry.mapMissed + rightEntry.capitalMissed + rightEntry.missedAnswers;
+
+      return rightPriority - leftPriority || leftEntry.masteryScore - rightEntry.masteryScore;
+    })
+    .slice(0, 8)
+    .map((state) => {
+      const entry = progress.byState[state.abbreviation];
+
+      return {
+        state,
+        priority: entry.mapMissed + entry.capitalMissed + entry.missedAnswers,
+        focus:
+          entry.mapMissed > entry.capitalMissed
+            ? "Map location"
+            : entry.capitalMissed > 0
+              ? "Capital recall"
+              : "Mixed review"
+      };
+    });
+}
+
+export function getParentStudyPlan(progress: ProgressData) {
+  const mapTargets = getMostMissedMapStates(progress).slice(0, 2);
+  const capitalTargets = getMostMissedCapitals(progress).slice(0, 2);
+  const weakRegions = regions
+    .map((region) => ({ region, accuracy: getRegionAccuracy(region, progress) }))
+    .sort((left, right) => left.accuracy - right.accuracy)
+    .slice(0, 2);
+
+  return [
+    weakRegions[0]
+      ? `Start with ${weakRegions[0].region} because it has the lowest accuracy right now.`
+      : "Start with the current region and keep sessions short.",
+    mapTargets.length > 0
+      ? `Run map-only reps for ${mapTargets.map((state) => state.name).join(" and ")}.`
+      : "Run a short map-only session first.",
+    capitalTargets.length > 0
+      ? `Finish with typed capitals for ${capitalTargets.map((state) => state.capital).join(" and ")}.`
+      : "Finish with 3 typed capital answers for retrieval practice."
+  ];
 }
 
 export function getEarnedBadges(progress: ProgressData) {

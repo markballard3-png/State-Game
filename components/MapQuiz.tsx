@@ -1,22 +1,25 @@
-import { ProgressData, StateInfo } from "@/types/game";
+import { ProgressData, StateInfo, StateProgress } from "@/types/game";
 import { InteractiveUSMap } from "@/components/InteractiveUSMap";
+import { StudyCuePanel } from "@/components/StudyCuePanel";
 
 export function MapQuiz({
   targetState,
   states,
   misses,
   progress,
+  stateProgress,
   onGuess
 }: {
   targetState: StateInfo;
   states: StateInfo[];
   misses: number;
   progress: ProgressData;
+  stateProgress: StateProgress;
   onGuess: (guess: string) => void;
 }) {
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-[1.1fr_0.9fr] gap-4">
+      <div className="grid grid-cols-[1.05fr_0.75fr_0.8fr] gap-4">
         <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
             Find the State
@@ -52,6 +55,12 @@ export function MapQuiz({
             </div>
           </div>
         </div>
+        <StudyCuePanel
+          state={targetState}
+          progress={stateProgress}
+          variant="map"
+          misses={misses}
+        />
       </div>
       <InteractiveUSMap
         states={states}

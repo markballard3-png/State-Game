@@ -1,4 +1,12 @@
-import { getRecommendedPractice, getRegionAccuracy, getRank } from "@/lib/game";
+import {
+  getParentStudyPlan,
+  getRecommendedPractice,
+  getRegionAccuracy,
+  getRank,
+  getReviewQueue
+} from "@/lib/game";
+import { ParentStudyPlan } from "@/components/ParentStudyPlan";
+import { ReviewQueuePanel } from "@/components/ReviewQueuePanel";
 import { regions, states } from "@/data/states";
 import { ProgressData } from "@/types/game";
 
@@ -30,6 +38,8 @@ export function ParentDashboard({
     )
     .slice(0, 5);
   const recommended = getRecommendedPractice(progress);
+  const studyPlan = getParentStudyPlan(progress);
+  const reviewQueue = getReviewQueue(progress).slice(0, 6);
 
   return (
     <section className="space-y-5">
@@ -92,6 +102,10 @@ export function ParentDashboard({
           />
         ))}
       </Panel>
+      <div className="grid grid-cols-2 gap-4">
+        <ParentStudyPlan plan={studyPlan} />
+        <ReviewQueuePanel queue={reviewQueue} />
+      </div>
       <div className="flex justify-end">
         <button
           type="button"

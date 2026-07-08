@@ -323,9 +323,6 @@ export function GameClient() {
       if (event.key === "3") setDifficulty(3);
       if (event.key === "4") setDifficulty(4);
       if (event.key === "5") setDifficulty(5);
-      if (event.key.toLowerCase() === "p") setActiveMode("practice");
-      if (event.key.toLowerCase() === "r") setActiveMode("roadTrip");
-      if (event.key.toLowerCase() === "b") setActiveMode("bowl");
     }
 
     window.addEventListener("keydown", handleKeyboard);
@@ -974,19 +971,19 @@ export function GameClient() {
     <AppShell>
       <div className="relative mx-auto max-w-[1180px]">
         <div className={`grid gap-4 ${isStandardPrompt ? "min-h-[calc(100vh-3rem)]" : ""}`}>
-          <header className="rounded-[28px] border border-white/10 bg-slate-950/75 p-5 shadow-panel backdrop-blur">
+          <header className="playful-card rounded-[28px] p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
+                <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">
                   State Game
                 </p>
-                <h1 className="mt-2 text-3xl font-black leading-tight text-white">
+                <h1 className="mt-2 text-3xl font-black leading-tight text-white sm:text-4xl">
                   One question at a time
                 </h1>
-                <p className="mt-2 text-sm text-slate-300">
+                <p className="mt-2 text-base text-slate-100/90">
                   {currentInstructions}
                 </p>
-                <p className="mt-2 text-sm font-semibold text-neon">{currentGoal}</p>
+                <p className="mt-2 text-base font-bold text-[#86efac]">{currentGoal}</p>
               </div>
               <div className="max-w-md">
                 <FeedbackBanner message={feedback} variant={feedbackVariant} />
@@ -996,7 +993,7 @@ export function GameClient() {
 
           {isStandardPrompt ? (
             <section className="relative grid flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-              <main className="rounded-[28px] border border-white/10 bg-slate-950/75 p-5 shadow-panel backdrop-blur">
+              <main className="playful-panel rounded-[28px] p-5">
                 {prompt.questionType === "map" ? (
                   <MapQuiz
                     targetState={prompt.state}
@@ -1018,8 +1015,8 @@ export function GameClient() {
                 )}
               </main>
               <aside className="grid gap-4">
-                <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-4 shadow-panel backdrop-blur">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                <div className="playful-card rounded-[28px] p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-200">
                     Level
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1028,10 +1025,10 @@ export function GameClient() {
                         key={value}
                         type="button"
                         onClick={() => setDifficulty(value)}
-                        className={`rounded-2xl border px-4 py-2 text-sm font-semibold ${
+                        className={`rounded-2xl border px-4 py-2 text-sm font-bold transition ${
                           difficulty === value
-                            ? "border-neon bg-neon/10 text-white"
-                            : "border-white/10 bg-slate-950/50 text-slate-300"
+                            ? "border-white/50 bg-white/20 text-white"
+                            : "border-white/15 bg-white/10 text-slate-100"
                         }`}
                       >
                         {label}
@@ -1041,37 +1038,37 @@ export function GameClient() {
                   <button
                     type="button"
                     onClick={handleStartPractice}
-                    className="mt-4 w-full rounded-3xl bg-gold px-5 py-3 text-base font-black text-slate-950 transition hover:brightness-110"
+                    className="mt-4 w-full rounded-3xl bg-gradient-to-r from-[#ffd166] to-[#ffb703] px-5 py-3 text-base font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:brightness-110"
                   >
                     Start
                   </button>
                 </div>
-                <div className="rounded-[28px] border border-white/10 bg-slate-950/75 p-4 shadow-panel backdrop-blur">
+                <div className="playful-card rounded-[28px] p-4">
                   <div className="grid grid-cols-2 gap-2 text-center">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Time</p>
-                      <p className="mt-1 text-2xl font-black text-gold">
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Time</p>
+                      <p className="mt-1 text-2xl font-black text-[#fde68a]">
                         {activeMode === "practice" && practiceRoundStarted
                           ? formatRoundTime(roundSecondsRemaining)
                           : "--:--"}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Score</p>
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Score</p>
                       <p className="mt-1 text-2xl font-black text-white">{score}</p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Streak</p>
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Streak</p>
                       <p className="mt-1 text-2xl font-black text-white">{streak}</p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Correct</p>
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Correct</p>
                       <p className="mt-1 text-2xl font-black text-white">{accuracy}%</p>
                     </div>
                   </div>
-                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">How to Play</p>
-                    <p className="mt-2 text-sm text-slate-200">
+                  <div className="mt-3 rounded-2xl border border-white/15 bg-white/10 p-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-200">How to Play</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-100">
                       Press Start, tap the state on the map, then pick its capital.
                     </p>
                   </div>
@@ -1099,25 +1096,6 @@ export function GameClient() {
                   onResetSession={resetSessionLayer}
                 />
 
-                {activeMode === "roadTrip" ? (
-                  <RoadTripMode
-                    region={activeRegion}
-                    regionCompleted={regionCompleted}
-                    progress={progress}
-                    regionStates={states.filter((state) => state.region === activeRegion)}
-                  />
-                ) : null}
-                {activeMode === "bowl" ? (
-                  <BowlGameReview reviewCount={reviewCount} reviewStates={weakStates} />
-                ) : null}
-                {activeMode === "championship" ? (
-                  <ChampionshipMode
-                    masteredCount={masteredCount}
-                    accuracy={accuracy}
-                    reviewCount={reviewCount}
-                  />
-                ) : null}
-
                 {activeMode === "dashboard" ? (
                   <ParentDashboard progress={progress} onResetProgress={handleResetProgress} />
                 ) : prompt?.kind === "rivalry" ? (
@@ -1141,9 +1119,9 @@ export function GameClient() {
                   })()
                 ) : (
                   <div className="flex min-h-[320px] items-center justify-center">
-                    <div className="w-full max-w-xl rounded-[28px] border border-white/10 bg-white/5 p-8 text-center">
-                      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gold">
-                        Ready To Play
+                    <div className="playful-card w-full max-w-xl rounded-[28px] p-8 text-center">
+                      <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">
+                        Main Game
                       </p>
                       <h2 className="mt-3 text-3xl font-black text-white">
                         Start your next question

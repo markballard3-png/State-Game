@@ -24,6 +24,30 @@ export function getStateByCode(code: string) {
   return states.find((state) => state.abbreviation === code);
 }
 
+export function normalizeAnswer(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\bst\b/g, "saint")
+    .replace(/\s+/g, " ");
+}
+
+export function isCorrectCapitalAnswer(answer: string, capital: string) {
+  const normalizedAnswer = normalizeAnswer(answer);
+  const normalizedCapital = normalizeAnswer(capital);
+
+  if (normalizedAnswer === normalizedCapital) {
+    return true;
+  }
+
+  if (normalizedCapital === "saint paul" && normalizedAnswer === "st paul") {
+    return true;
+  }
+
+  return false;
+}
+
 export function buildCapitalOptions(target: StateInfo, pool: StateInfo[]) {
   const sameRegion = pool.filter(
     (state) =>
@@ -287,6 +311,30 @@ export function getRecommendedPractice(progress: ProgressData) {
   });
 
   return sorted.slice(0, 5);
+}
+
+export function getRegionMastery(region: Region, progress: ProgressData) {
+  const regionStates = states.filter((state) => state.region === region);
+  const totalMastery = regionStates.reduce(
+    (sum, state) => sum + progress.byState[state.abbreviation].masteryScore,
+    0
+  );
+
+  return Math.round(totalMastery / regionStates.length);
+}
+
+export function getBowlName(region: Region) {
+  const names: Record<Region, string> = {
+    "Northeast Division": "New England Bowl",
+    "ACC / Atlantic Division": "Atlantic Coast Bowl",
+    "SEC South Division": "Dixie Bowl",
+    "Big Ten Midwest Division": "Great Lakes Bowl",
+    "Big 12 Plains Division": "Heartland Bowl",
+    "Mountain West Division": "Rocky Mountain Bowl",
+    "Pac-12 West Coast Division": "Pacific Coast Bowl"
+  };
+
+  return names[region];
 }
 
 export function getWeakStates(progress: ProgressData) {

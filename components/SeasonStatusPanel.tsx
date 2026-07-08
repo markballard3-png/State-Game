@@ -29,6 +29,14 @@ export function SeasonStatusPanel({
             {progress.stats.seasonWins}-{progress.stats.seasonLosses}
           </span>
         </div>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-sm text-slate-300">XP Bank</span>
+          <span className="text-sm font-semibold text-white">{progress.stats.xp}</span>
+        </div>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-sm text-slate-300">Bowl Trophies</span>
+          <span className="text-sm font-semibold text-white">{progress.stats.bowlTrophies}</span>
+        </div>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Badges</p>

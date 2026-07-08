@@ -21,13 +21,16 @@ import { RoadTripMode } from "@/components/RoadTripMode";
 import { Scoreboard } from "@/components/Scoreboard";
 import { SeasonStatusPanel } from "@/components/SeasonStatusPanel";
 import { StateCard } from "@/components/StateCard";
+import { TeamCardCollection } from "@/components/TeamCardCollection";
 import { TrophyCabinet } from "@/components/TrophyCabinet";
+import { RewardTrack } from "@/components/RewardTrack";
 import { regions, states } from "@/data/states";
 import {
   buildPrompt,
   getConferenceStandings,
   getEarnedBadges,
   getEarnedTrophies,
+  isCorrectCapitalAnswer,
   getNextPracticeLabel,
   getRank,
   getStateByCode,
@@ -142,11 +145,10 @@ export function GameClient() {
       return;
     }
 
-    const correctAnswer =
-      prompt.questionType === "map" ? prompt.state.abbreviation : prompt.state.capital;
-    const normalizedGuess = answer.trim().toLowerCase();
-    const normalizedCorrect = correctAnswer.trim().toLowerCase();
-    const wasCorrect = normalizedGuess === normalizedCorrect;
+    const wasCorrect =
+      prompt.questionType === "map"
+        ? answer.trim().toLowerCase() === prompt.state.abbreviation.toLowerCase()
+        : isCorrectCapitalAnswer(answer, prompt.state.capital);
     const nextProgress = updateProgressForAnswer({
       progress,
       stateCode: prompt.state.abbreviation,
@@ -358,11 +360,25 @@ export function GameClient() {
             </header>
 
             {activeMode === "roadTrip" ? (
-              <RoadTripMode region={activeRegion} regionCompleted={regionCompleted} />
+              <RoadTripMode
+                region={activeRegion}
+                regionCompleted={regionCompleted}
+                progress={progress}
+                regionStates={states.filter((state) => state.region === activeRegion)}
+              />
             ) : null}
-            {activeMode === "bowl" ? <BowlGameReview reviewCount={reviewCount} /> : null}
+            {activeMode === "bowl" ? (
+              <BowlGameReview
+                reviewCount={reviewCount}
+                reviewStates={weakStates}
+              />
+            ) : null}
             {activeMode === "championship" ? (
-              <ChampionshipMode masteredCount={masteredCount} />
+              <ChampionshipMode
+                masteredCount={masteredCount}
+                accuracy={accuracy}
+                reviewCount={reviewCount}
+              />
             ) : null}
 
             {activeMode === "dashboard" ? (
@@ -393,6 +409,7 @@ export function GameClient() {
                     targetState={prompt.state}
                     states={states}
                     misses={missesThisPrompt}
+                    progress={progress}
                     onGuess={handleStandardAnswer}
                   />
                 ) : (
@@ -406,6 +423,11 @@ export function GameClient() {
                 <StateCard
                   state={selectedState}
                   progress={progress.byState[selectedState.abbreviation]}
+                />
+                <TeamCardCollection
+                  states={states}
+                  progress={progress}
+                  onSelect={setSelectedState}
                 />
               </>
             ) : null}
@@ -421,6 +443,7 @@ export function GameClient() {
               accuracy={accuracy}
             />
             <ConferenceStandings standings={conferenceStandings} />
+            <RewardTrack progress={progress} />
             <RecruitingBoard states={states} progress={progress} />
             <FilmRoomPanel weakStates={weakStates} recommendation={nextPracticeLabel} />
             <TrophyCabinet trophies={progress.trophies} />

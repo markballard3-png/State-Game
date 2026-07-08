@@ -8,6 +8,7 @@ export type Region =
   | "Pac-12 West Coast Division";
 
 export type DifficultyLevel = 1 | 2 | 3 | 4 | 5;
+export type DrillFocus = "mixed" | "map" | "capital-choice" | "capital-typed";
 
 export type GameMode =
   | "practice"

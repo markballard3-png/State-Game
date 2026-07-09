@@ -54,6 +54,8 @@ import { StateCard } from "@/components/StateCard";
 import { TrophyCabinet } from "@/components/TrophyCabinet";
 import { UnlockPreviewPanel } from "@/components/UnlockPreviewPanel";
 import { ReviewQueuePanel } from "@/components/ReviewQueuePanel";
+import { RocketLandingPanel } from "@/components/RocketLandingPanel";
+import { RocketOutcomeOverlay } from "@/components/RocketOutcomeOverlay";
 import { RewardTrack } from "@/components/RewardTrack";
 import { WeeklyGoalsPanel } from "@/components/WeeklyGoalsPanel";
 import { regions, states } from "@/data/states";
@@ -191,6 +193,9 @@ export function GameClient() {
   const [roundSecondsRemaining, setRoundSecondsRemaining] = useState(420);
   const [practiceRoundStarted, setPracticeRoundStarted] = useState(false);
   const [practiceRemainingCodes, setPracticeRemainingCodes] = useState<string[]>([]);
+  const [completedStateCodes, setCompletedStateCodes] = useState<string[]>([]);
+  const [strugglingStateCodes, setStrugglingStateCodes] = useState<string[]>([]);
+  const [rocketOutcome, setRocketOutcome] = useState<null | "perfect" | "damaged" | "crash">(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [momentumMoments, setMomentumMoments] = useState<string[]>([
     "Season opened. Start stacking correct answers to build momentum."
@@ -278,6 +283,8 @@ export function GameClient() {
     setCapitalChallenge(null);
     setPracticeRoundStarted(false);
     setPracticeRemainingCodes([]);
+    setCompletedStateCodes([]);
+    setStrugglingStateCodes([]);
   }, [activeMode, difficulty, hydrated]);
 
   useEffect(() => {
@@ -300,6 +307,15 @@ export function GameClient() {
   }, [showConfetti]);
 
   useEffect(() => {
+    if (!rocketOutcome) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setRocketOutcome(null), 4200);
+    return () => window.clearTimeout(timeoutId);
+  }, [rocketOutcome]);
+
+  useEffect(() => {
     if (activeMode !== "practice" || roundSecondsRemaining > 0) {
       return;
     }
@@ -308,9 +324,12 @@ export function GameClient() {
     setCapitalChallenge(null);
     setPracticeRoundStarted(false);
     setPracticeRemainingCodes([]);
+    setCompletedStateCodes([]);
+    setStrugglingStateCodes([]);
+    setRocketOutcome(getRocketOutcomeForCount(completedStateCodes.length));
     setFeedback("Time is up. Press Start to play again.");
     setFeedbackVariant("warning");
-  }, [activeMode, roundSecondsRemaining]);
+  }, [activeMode, roundSecondsRemaining, completedStateCodes.length]);
 
   useEffect(() => {
     if (!hydrated) {
@@ -451,6 +470,7 @@ export function GameClient() {
         setCapitalChallenge(null);
         setFeedback("Amazing job! You worked through all 50 states.");
         setFeedbackVariant("success");
+        setRocketOutcome("perfect");
         return [];
       }
 
@@ -467,6 +487,12 @@ export function GameClient() {
       setMissesThisPrompt(0);
       return remaining;
     });
+  }
+
+  function getRocketOutcomeForCount(count: number) {
+    if (count >= 50) return "perfect" as const;
+    if (count >= 40) return "damaged" as const;
+    return "crash" as const;
   }
 
   function addMomentumMoment(message: string) {
@@ -548,7 +574,17 @@ export function GameClient() {
         playLabel: `${prompt.state.name}: missed on the map`,
         wasCorrect: false
       });
-      setMissesThisPrompt((current) => current + 1);
+      setMissesThisPrompt((current) => {
+        const nextMisses = current + 1;
+        if (nextMisses >= 2) {
+          setStrugglingStateCodes((existing) =>
+            existing.includes(prompt.state.abbreviation)
+              ? existing
+              : [...existing, prompt.state.abbreviation]
+          );
+        }
+        return nextMisses;
+      });
       setFeedback("Try again on the map. After two misses, the answer will glow.");
       setFeedbackVariant("warning");
       return;
@@ -740,6 +776,8 @@ export function GameClient() {
     setRoundSecondsRemaining(getRoundSecondsForDifficulty(1));
     setPracticeRoundStarted(false);
     setPracticeRemainingCodes([]);
+    setCompletedStateCodes([]);
+    setStrugglingStateCodes([]);
     setCapitalChallenge(null);
     setShowConfetti(false);
     setLongestDrive(0);
@@ -758,6 +796,8 @@ export function GameClient() {
     setRoundSecondsRemaining(getRoundSecondsForDifficulty(difficulty));
     setPracticeRoundStarted(false);
     setPracticeRemainingCodes([]);
+    setCompletedStateCodes([]);
+    setStrugglingStateCodes([]);
     setCapitalChallenge(null);
     setShowConfetti(false);
     setLongestDrive(0);
@@ -875,6 +915,16 @@ export function GameClient() {
     { label: "Hard · 3 min", value: 4 }
   ];
   const isStandardPrompt = prompt?.kind === "standard";
+  const hardStates = states.filter((state) => strugglingStateCodes.includes(state.abbreviation));
+  const completedCount = completedStateCodes.length;
+  const rocketStatus =
+    completedCount >= 50
+      ? "Rocket landed in great condition!"
+      : completedCount >= 40
+        ? "Rocket lands, but it is a little damaged."
+        : completedCount >= 30
+          ? "Rocket crash landing. Keep practicing those hard states."
+          : "Guide the rocket down by getting more states right.";
 
   function applyPracticePreset(preset: {
     drillFocus: DrillFocus;
@@ -895,6 +945,9 @@ export function GameClient() {
     setActiveMode("practice");
     setPracticeRoundStarted(true);
     setPracticeRemainingCodes(nextQueue);
+    setCompletedStateCodes([]);
+    setStrugglingStateCodes([]);
+    setRocketOutcome(null);
     setRoundSecondsRemaining(getRoundSecondsForDifficulty(difficulty));
     setForcedStateCode(null);
     setCapitalChallenge(null);
@@ -940,6 +993,14 @@ export function GameClient() {
       setScore((current) => current + 10 + streak);
       setSessionBestStreak((current) => Math.max(current, nextStreak));
       setStreak((current) => current + 1);
+      setCompletedStateCodes((existing) =>
+        existing.includes(capitalChallenge.state.abbreviation)
+          ? existing
+          : [...existing, capitalChallenge.state.abbreviation]
+      );
+      setStrugglingStateCodes((existing) =>
+        existing.filter((code) => code !== capitalChallenge.state.abbreviation)
+      );
       updateDrive({
         gain: 18,
         playLabel: `${capitalChallenge.state.name}: capital answer locked in`,
@@ -1000,6 +1061,8 @@ export function GameClient() {
                     states={states}
                     misses={missesThisPrompt}
                     progress={progress}
+                    completedStates={completedStateCodes}
+                    strugglingStates={strugglingStateCodes}
                     onGuess={handleStandardAnswer}
                   />
                 ) : (
@@ -1072,6 +1135,28 @@ export function GameClient() {
                       Press Start, tap the state on the map, then pick its capital.
                     </p>
                   </div>
+                  <RocketLandingPanel
+                    completedCount={completedCount}
+                    status={rocketStatus}
+                    hardStateCount={hardStates.length}
+                  />
+                  <div className="mt-3 rounded-2xl border border-white/15 bg-white/10 p-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-200">Hard States</p>
+                    <div className="mt-2 flex min-h-12 flex-wrap gap-2">
+                      {hardStates.length > 0 ? (
+                        hardStates.map((state) => (
+                          <span
+                            key={state.abbreviation}
+                            className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-bold text-red-100"
+                          >
+                            {state.name}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-100/75">No hard states yet. Nice work.</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </aside>
               {capitalChallenge ? (
@@ -1081,6 +1166,7 @@ export function GameClient() {
                   onChoose={handleCapitalChallengeAnswer}
                 />
               ) : null}
+              {rocketOutcome ? <RocketOutcomeOverlay outcome={rocketOutcome} /> : null}
               {showConfetti ? <ConfettiBurst /> : null}
             </section>
           ) : (

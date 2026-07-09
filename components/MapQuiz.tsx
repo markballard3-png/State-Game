@@ -6,12 +6,16 @@ export function MapQuiz({
   states,
   misses,
   progress,
+  completedStates,
+  strugglingStates,
   onGuess
 }: {
   targetState: StateInfo;
   states: StateInfo[];
   misses: number;
   progress: ProgressData;
+  completedStates: string[];
+  strugglingStates: string[];
   onGuess: (guess: string) => void;
 }) {
   return (
@@ -31,6 +35,8 @@ export function MapQuiz({
         targetState={misses >= 2 ? targetState.abbreviation : undefined}
         highlightedRegion={misses >= 2 ? targetState.region : null}
         progress={progress}
+        completedStates={completedStates}
+        strugglingStates={strugglingStates}
         onSelect={onGuess}
       />
     </div>

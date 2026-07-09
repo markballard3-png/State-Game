@@ -31,15 +31,21 @@ export function InteractiveUSMap({
   targetState,
   highlightedRegion,
   progress,
+  completedStates,
+  strugglingStates,
   onSelect
 }: {
   states: StateInfo[];
   targetState?: string;
   highlightedRegion?: string | null;
   progress: ProgressData;
+  completedStates?: string[];
+  strugglingStates?: string[];
   onSelect: (code: string) => void;
 }) {
   const stateLookup = new Map(states.map((state) => [state.abbreviation, state]));
+  const completedLookup = new Set(completedStates ?? []);
+  const strugglingLookup = new Set(strugglingStates ?? []);
 
   return (
     <section className="playful-panel rounded-[28px] p-4">
@@ -76,7 +82,17 @@ export function InteractiveUSMap({
           const mastery = progress.byState[code].masteryScore;
           const isTarget = targetState === code;
           const isHighlightedRegion = highlightedRegion ? state.region === highlightedRegion : false;
-          const fill = isTarget ? "#34d399" : mastery >= 85 ? "#60a5fa" : mastery >= 60 ? "#7dd3fc" : "#bfdbfe";
+          const fill = completedLookup.has(code)
+            ? "#22c55e"
+            : strugglingLookup.has(code)
+              ? "#ef4444"
+              : isTarget
+                ? "#34d399"
+                : mastery >= 85
+                  ? "#60a5fa"
+                  : mastery >= 60
+                    ? "#7dd3fc"
+                    : "#bfdbfe";
 
           return (
             <path

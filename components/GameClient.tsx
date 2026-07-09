@@ -320,16 +320,20 @@ export function GameClient() {
       return;
     }
 
+    const roundAccuracy = sessionQuestions
+      ? Math.round((sessionCorrect / sessionQuestions) * 100)
+      : 0;
+
     setPrompt(null);
     setCapitalChallenge(null);
     setPracticeRoundStarted(false);
     setPracticeRemainingCodes([]);
     setCompletedStateCodes([]);
     setStrugglingStateCodes([]);
-    setRocketOutcome(getRocketOutcomeForCount(completedStateCodes.length));
+    setRocketOutcome(getRocketOutcomeForAccuracy(roundAccuracy));
     setFeedback("Time is up. Press Start to play again.");
     setFeedbackVariant("warning");
-  }, [activeMode, roundSecondsRemaining, completedStateCodes.length]);
+  }, [activeMode, roundSecondsRemaining, sessionCorrect, sessionQuestions]);
 
   useEffect(() => {
     if (!hydrated) {
@@ -470,7 +474,7 @@ export function GameClient() {
         setCapitalChallenge(null);
         setFeedback("Amazing job! You worked through all 50 states.");
         setFeedbackVariant("success");
-        setRocketOutcome("perfect");
+        setRocketOutcome(getRocketOutcomeForAccuracy(sessionAccuracy));
         return [];
       }
 
@@ -489,9 +493,9 @@ export function GameClient() {
     });
   }
 
-  function getRocketOutcomeForCount(count: number) {
-    if (count >= 50) return "perfect" as const;
-    if (count >= 40) return "damaged" as const;
+  function getRocketOutcomeForAccuracy(accuracyValue: number) {
+    if (accuracyValue >= 90) return "perfect" as const;
+    if (accuracyValue >= 80) return "damaged" as const;
     return "crash" as const;
   }
 
@@ -918,13 +922,11 @@ export function GameClient() {
   const hardStates = states.filter((state) => strugglingStateCodes.includes(state.abbreviation));
   const completedCount = completedStateCodes.length;
   const rocketStatus =
-    completedCount >= 50
-      ? "Rocket landed in great condition!"
-      : completedCount >= 40
-        ? "Rocket lands, but it is a little damaged."
-        : completedCount >= 30
-          ? "Rocket crash landing. Keep practicing those hard states."
-          : "Guide the rocket down by getting more states right.";
+    sessionAccuracy >= 90
+      ? "Amazing job! Huge celebration time — that rocket lands like a champion."
+      : sessionAccuracy >= 80
+        ? "Close call! Smoky landing, but you still brought the rocket home."
+        : "Boom! Under 80% means a giant explosion. Let’s train and try again.";
 
   function applyPracticePreset(preset: {
     drillFocus: DrillFocus;
@@ -1053,7 +1055,7 @@ export function GameClient() {
           </header>
 
           {isStandardPrompt ? (
-            <section className="relative grid flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+            <section className="relative grid flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
               <main className="playful-panel rounded-[28px] p-5">
                 {prompt.questionType === "map" ? (
                   <MapQuiz
@@ -1076,67 +1078,72 @@ export function GameClient() {
                     onSubmit={handleStandardAnswer}
                   />
                 )}
+                <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="playful-card rounded-[28px] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-200">
+                      Level
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {simpleLevelOptions.map(({ label, value }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setDifficulty(value)}
+                          className={`rounded-2xl border px-4 py-2 text-sm font-bold transition ${
+                            difficulty === value
+                              ? "border-white/50 bg-white/20 text-white"
+                              : "border-white/15 bg-white/10 text-slate-100"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleStartPractice}
+                      className="mt-4 w-full rounded-3xl bg-gradient-to-r from-[#ffd166] to-[#ffb703] px-5 py-3 text-base font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:brightness-110"
+                    >
+                      Start
+                    </button>
+                  </div>
+                  <div className="playful-card rounded-[28px] p-4">
+                    <div className="grid grid-cols-2 gap-2 text-center">
+                      <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Time</p>
+                        <p className="mt-1 text-2xl font-black text-[#fde68a]">
+                          {activeMode === "practice" && practiceRoundStarted
+                            ? formatRoundTime(roundSecondsRemaining)
+                            : "--:--"}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Score</p>
+                        <p className="mt-1 text-2xl font-black text-white">{score}</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Streak</p>
+                        <p className="mt-1 text-2xl font-black text-white">{streak}</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Correct</p>
+                        <p className="mt-1 text-2xl font-black text-white">{accuracy}%</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-2xl border border-white/15 bg-white/10 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-200">How to Play</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-100">
+                        Press Start, tap the state on the map, then pick its capital.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </main>
               <aside className="grid gap-4">
                 <div className="playful-card rounded-[28px] p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-200">
-                    Level
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {simpleLevelOptions.map(({ label, value }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setDifficulty(value)}
-                        className={`rounded-2xl border px-4 py-2 text-sm font-bold transition ${
-                          difficulty === value
-                            ? "border-white/50 bg-white/20 text-white"
-                            : "border-white/15 bg-white/10 text-slate-100"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleStartPractice}
-                    className="mt-4 w-full rounded-3xl bg-gradient-to-r from-[#ffd166] to-[#ffb703] px-5 py-3 text-base font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:brightness-110"
-                  >
-                    Start
-                  </button>
-                </div>
-                <div className="playful-card rounded-[28px] p-4">
-                  <div className="grid grid-cols-2 gap-2 text-center">
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Time</p>
-                      <p className="mt-1 text-2xl font-black text-[#fde68a]">
-                        {activeMode === "practice" && practiceRoundStarted
-                          ? formatRoundTime(roundSecondsRemaining)
-                          : "--:--"}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Score</p>
-                      <p className="mt-1 text-2xl font-black text-white">{score}</p>
-                    </div>
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Streak</p>
-                      <p className="mt-1 text-2xl font-black text-white">{streak}</p>
-                    </div>
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-200">Correct</p>
-                      <p className="mt-1 text-2xl font-black text-white">{accuracy}%</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 rounded-2xl border border-white/15 bg-white/10 p-3">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-200">How to Play</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-100">
-                      Press Start, tap the state on the map, then pick its capital.
-                    </p>
-                  </div>
                   <RocketLandingPanel
                     completedCount={completedCount}
+                    accuracy={sessionAccuracy}
                     status={rocketStatus}
                     hardStateCount={hardStates.length}
                   />
